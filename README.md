@@ -2,9 +2,10 @@
 
 > **Event Window**: 25 - 27 Settembre 2026 (48 ore, inizio Venerdì 15:00 UTC - fine Domenica 15:00 UTC)  
 > **Platform**: [lablab.ai](https://lablab.ai)  
+> **Team**: **Nagare** (流れ — Flow State, Solo Builder)  
 > **Theme**: Agentic Development with IBM Bob 2.0  
 > **Prize Pool**: $10,000 - $12,000 + pass per IBM TechXchange 2026 (Atlanta)  
-> **Team Size**: 1 - 6 persone  
+> **Team Size**: Solo (Closed)  
 
 ---
 
