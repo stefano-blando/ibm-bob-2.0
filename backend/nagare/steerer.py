@@ -68,12 +68,15 @@ class MicroSteerer:
         tracked = (res.returncode == 0)
 
         if tracked:
-            subprocess.run(
-                ["git", "checkout", "--", str(rel)],
-                cwd=self.repo_root,
-                check=True,
-                capture_output=True
-            )
+            for _ in range(5):
+                checkout_res = subprocess.run(
+                    ["git", "checkout", "--", str(rel)],
+                    cwd=self.repo_root,
+                    capture_output=True
+                )
+                if checkout_res.returncode == 0:
+                    break
+                time.sleep(0.02)
         else:
             if full_path.exists():
                 if full_path.is_dir():
