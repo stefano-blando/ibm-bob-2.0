@@ -8,7 +8,7 @@ def main():
         prog="nagare",
         description="Nagare Governor: Lane-Assist for Autonomous AI Coding Agents"
     )
-    parser.add_argument("command", choices=["run", "watch", "ui"], help="Command to execute")
+    parser.add_argument("command", choices=["run", "watch", "ui", "mcp", "benchmark"], help="Command to execute")
     parser.add_argument("prompt", nargs="?", default="", help="Task prompt for the agent")
     parser.add_argument("--repo", default=".", help="Path to repository root (default: current directory)")
     parser.add_argument("--dry-run", action="store_true", help="Simulate without launching the agent process")
@@ -41,6 +41,18 @@ def main():
         print(f"\n🌊 Launching Nagare Flight Recorder Web UI at http://{args.host}:{args.port}...")
         app = create_app(repo_root=repo_path)
         uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    elif args.command == "mcp":
+        from nagare.mcp_server import NagareMCPServer
+        server = NagareMCPServer(repo_root=repo_path)
+        server.run_stdio()
+    elif args.command == "benchmark":
+        from nagare.benchmark import run_micro_rollback_benchmark
+        print(f"\n🌊 Running Nagare Micro-Rollback Benchmark on {repo_path} (50 iterations)...")
+        res = run_micro_rollback_benchmark(repo_root=repo_path, iterations=50)
+        print(f"  Avg Latency:    {res.avg_latency_ms:.2f} ms")
+        print(f"  Median Latency: {res.median_latency_ms:.2f} ms")
+        print(f"  P99 Latency:    {res.p99_latency_ms:.2f} ms")
+        print(f"  Safety Rate:    {res.success_rate_percent:.1f}% ({res.corruptions_blocked}/{res.iterations})")
 
 if __name__ == "__main__":
     main()

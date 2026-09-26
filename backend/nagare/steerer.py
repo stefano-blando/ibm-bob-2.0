@@ -69,6 +69,17 @@ class MicroSteerer:
         tracked = (res.returncode == 0)
 
         if tracked:
+            # 1. Lockless Git blob restore: reads directly from .git/objects without touching .git/index.lock
+            show_res = subprocess.run(
+                ["git", "show", f"HEAD:{rel}"],
+                cwd=self.repo_root,
+                capture_output=True
+            )
+            if show_res.returncode == 0:
+                full_path.parent.mkdir(parents=True, exist_ok=True)
+                full_path.write_bytes(show_res.stdout)
+
+            # 2. Attempt staging index reconciliation (non-fatal if index.lock is held concurrently)
             for _ in range(5):
                 checkout_res = subprocess.run(
                     ["git", "checkout", "HEAD", "--", str(rel)],
@@ -94,9 +105,28 @@ class MicroSteerer:
             f"Directive: Implement the solution strictly within permitted files without modifying '{rel}'."
         )
 
+        # Write authoritative directive file in repo root for autonomous agent consumption
+        try:
+            directive_file = self.repo_root / ".nagare_directive.md"
+            directive_file.write_text(
+                f"# ⚠️ NAGARE GOVERNOR STEERING DIRECTIVE\n\n"
+                f"> **Violation Intercepted at**: {now}\n"
+                f"> **Restricted Target**: `{rel}` (Rolled Back)\n\n"
+                f"### Active Scope Constraints\n"
+                f"- **Permitted Files**: {permitted_list}\n"
+                f"- **Restricted Files**: `{rel}`, database schemas, and global configs.\n\n"
+                f"### Mandatory Agent Directive\n"
+                f"The modification to `{rel}` was rolled back to pristine HEAD state by Nagare Governor.\n"
+                f"**DO NOT** attempt to edit `{rel}` again.\n"
+                f"Solve the user request exclusively by modifying the permitted files listed above.\n"
+            )
+        except Exception:
+            pass
+
         return ViolationEvent(
             file_path=rel,
             action=ViolationAction.ROLLED_BACK,
             timestamp=now,
             steering_prompt=prompt
         )
+

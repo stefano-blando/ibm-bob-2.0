@@ -43,6 +43,7 @@ class ScopeSynthesizer:
         patterns = [
             r"""(?:import|export)\s+(?:.*?from\s+)?['"]([^'"]+)['"]""",
             r"""require\(['"]([^'"]+)['"]\)""",
+            r"""import\(['"]([^'"]+)['"]\)""",
         ]
         source_dir = (self.repo_root / rel_path).parent
         for pat in patterns:
@@ -100,6 +101,17 @@ class ScopeSynthesizer:
                                 self._add_python_import_edge(rel_path, alias.name)
                         elif isinstance(node, ast.ImportFrom) and node.module:
                             self._add_python_import_edge(rel_path, node.module)
+                        elif isinstance(node, ast.Call):
+                            # Dynamic import detection: importlib.import_module(...) or __import__(...)
+                            func_name = None
+                            if isinstance(node.func, ast.Name):
+                                func_name = node.func.id
+                            elif isinstance(node.func, ast.Attribute):
+                                func_name = node.func.attr
+                            if func_name in ("import_module", "__import__") and node.args:
+                                first_arg = node.args[0]
+                                if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
+                                    self._add_python_import_edge(rel_path, first_arg.value)
                 elif file_path.suffix in JS_TS_EXTENSIONS:
                     self._parse_js_ts_imports(rel_path, content)
             except Exception:
@@ -112,6 +124,24 @@ class ScopeSynthesizer:
         permitted: Set[Path] = set()
         restricted: Set[Path] = set()
 
+        sensitive_patterns = list(KNOWN_SENSITIVE_PATTERNS)
+        extra_permitted: Set[Path] = set()
+
+        # Check repository config overrides (nagare.json, .nagarerc.json)
+        for cfg_name in ("nagare.json", ".nagarerc.json", ".nagare.json"):
+            cfg_path = self.repo_root / cfg_name
+            if cfg_path.is_file():
+                import json
+                try:
+                    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+                    if "extra_restricted" in cfg and isinstance(cfg["extra_restricted"], list):
+                        sensitive_patterns.extend(cfg["extra_restricted"])
+                    if "extra_permitted" in cfg and isinstance(cfg["extra_permitted"], list):
+                        for p in cfg["extra_permitted"]:
+                            extra_permitted.add(Path(p))
+                except Exception:
+                    pass
+
         # Identify sensitive files
         for p in self.repo_root.rglob("*"):
             if p.is_file():
@@ -119,7 +149,7 @@ class ScopeSynthesizer:
                 if self._should_ignore(rel):
                     continue
                 rel_str = str(rel)
-                if any(re.match(pattern, rel_str) for pattern in KNOWN_SENSITIVE_PATTERNS):
+                if any(re.match(pattern, rel_str) for pattern in sensitive_patterns):
                     restricted.add(rel)
 
         # 1. Check explicit path mentions in prompt
@@ -152,6 +182,11 @@ class ScopeSynthesizer:
             for node in self.graph.nodes:
                 if node not in restricted:
                     permitted.add(node)
+
+        # Apply explicit repository config permitted files
+        for p in extra_permitted:
+            if p not in restricted:
+                permitted.add(p)
 
         return ScopeContract(
             permitted_paths=permitted,

@@ -24,3 +24,36 @@ def test_scope_synthesis_from_repo(tmp_path):
     # Restricted scope must strictly include database schema and core configs
     assert Path("database/schema.sql") in contract.restricted_paths
     assert Path("core/config.py") in contract.restricted_paths
+
+def test_dynamic_import_scope_synthesis(tmp_path):
+    (tmp_path / "app").mkdir()
+    (tmp_path / "plugins").mkdir()
+    # Python dynamic import
+    (tmp_path / "app" / "loader.py").write_text("import importlib\nplugin = importlib.import_module('plugins.custom_plugin')\n")
+    (tmp_path / "plugins" / "custom_plugin.py").write_text("def run(): pass\n")
+
+    synthesizer = ScopeSynthesizer(repo_root=tmp_path)
+    contract = synthesizer.synthesize_scope("Update plugin loader in app/loader.py")
+
+    assert Path("app/loader.py") in contract.permitted_paths
+    assert Path("plugins/custom_plugin.py") in contract.permitted_paths
+
+def test_repo_config_override_nagare_json(tmp_path):
+    import json
+    (tmp_path / "services").mkdir()
+    (tmp_path / "services" / "payment.py").write_text("def pay(): pass\n")
+    (tmp_path / "services" / "audit.py").write_text("def audit(): pass\n")
+
+    # Custom repository config
+    config = {
+        "extra_restricted": [r".*services/payment\.py$"],
+        "extra_permitted": ["services/audit.py"]
+    }
+    (tmp_path / "nagare.json").write_text(json.dumps(config))
+
+    synthesizer = ScopeSynthesizer(repo_root=tmp_path)
+    contract = synthesizer.synthesize_scope("General maintenance")
+
+    assert Path("services/payment.py") in contract.restricted_paths
+    assert Path("services/audit.py") in contract.permitted_paths
+
