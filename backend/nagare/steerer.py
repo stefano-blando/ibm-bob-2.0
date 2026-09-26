@@ -70,7 +70,7 @@ class MicroSteerer:
         if tracked:
             for _ in range(5):
                 checkout_res = subprocess.run(
-                    ["git", "checkout", "--", str(rel)],
+                    ["git", "checkout", "HEAD", "--", str(rel)],
                     cwd=self.repo_root,
                     capture_output=True
                 )
