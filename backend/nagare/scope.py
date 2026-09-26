@@ -26,6 +26,8 @@ COMMON_STOPWORDS = {
 
 IGNORE_DIRS = {".git", ".venv", "venv", "env", "__pycache__", ".pytest_cache", "node_modules", "bob_sessions"}
 
+JS_TS_EXTENSIONS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
+
 class ScopeSynthesizer:
     def __init__(self, repo_root: Path):
         self.repo_root = Path(repo_root).resolve()
@@ -37,34 +39,73 @@ class ScopeSynthesizer:
                 return True
         return False
 
+    def _parse_js_ts_imports(self, rel_path: Path, content: str):
+        patterns = [
+            r"""(?:import|export)\s+(?:.*?from\s+)?['"]([^'"]+)['"]""",
+            r"""require\(['"]([^'"]+)['"]\)""",
+        ]
+        source_dir = (self.repo_root / rel_path).parent
+        for pat in patterns:
+            for match in re.findall(pat, content):
+                if match.startswith("."):
+                    candidate = (source_dir / match).resolve()
+                    resolved = None
+                    if candidate.is_file():
+                        resolved = candidate
+                    else:
+                        for ext in [".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"]:
+                            ext_candidate = Path(str(candidate) + ext)
+                            if ext_candidate.is_file():
+                                resolved = ext_candidate
+                                break
+                    if resolved and (self.repo_root == resolved or self.repo_root in resolved.parents):
+                        try:
+                            self.graph.add_edge(rel_path, resolved.relative_to(self.repo_root))
+                        except ValueError:
+                            pass
+
+    def _add_python_import_edge(self, source_path: Path, module_name: str):
+        target_path = Path(*module_name.split(".")).with_suffix(".py")
+        if (self.repo_root / target_path).exists():
+            self.graph.add_edge(source_path, target_path)
+            return
+
+        source_dir = (self.repo_root / source_path).parent
+        candidate = (source_dir / Path(*module_name.split("."))).with_suffix(".py").resolve()
+        if candidate.exists() and (self.repo_root == candidate or self.repo_root in candidate.parents):
+            try:
+                self.graph.add_edge(source_path, candidate.relative_to(self.repo_root))
+            except ValueError:
+                pass
+
     def build_dependency_graph(self) -> nx.DiGraph:
         self.graph.clear()
-        py_files = [
-            f for f in self.repo_root.rglob("*.py")
-            if not self._should_ignore(f.relative_to(self.repo_root))
+        source_files = [
+            f for f in self.repo_root.rglob("*")
+            if f.is_file() and (f.suffix == ".py" or f.suffix in JS_TS_EXTENSIONS)
+            and not self._should_ignore(f.relative_to(self.repo_root))
         ]
         
-        for file_path in py_files:
+        for file_path in source_files:
             rel_path = file_path.relative_to(self.repo_root)
             self.graph.add_node(rel_path)
             
             try:
-                tree = ast.parse(file_path.read_text(encoding="utf-8"))
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.Import):
-                        for alias in node.names:
-                            self._add_import_edge(rel_path, alias.name)
-                    elif isinstance(node, ast.ImportFrom) and node.module:
-                        self._add_import_edge(rel_path, node.module)
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
+                if file_path.suffix == ".py":
+                    tree = ast.parse(content)
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.Import):
+                            for alias in node.names:
+                                self._add_python_import_edge(rel_path, alias.name)
+                        elif isinstance(node, ast.ImportFrom) and node.module:
+                            self._add_python_import_edge(rel_path, node.module)
+                elif file_path.suffix in JS_TS_EXTENSIONS:
+                    self._parse_js_ts_imports(rel_path, content)
             except Exception:
                 continue
                 
         return self.graph
-
-    def _add_import_edge(self, source_path: Path, module_name: str):
-        target_path = Path(*module_name.split(".")).with_suffix(".py")
-        if (self.repo_root / target_path).exists():
-            self.graph.add_edge(source_path, target_path)
 
     def synthesize_scope(self, task_prompt: str) -> ScopeContract:
         self.build_dependency_graph()
