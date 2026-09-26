@@ -40,6 +40,8 @@ class GitDiffObserver:
             if " -> " in parts:
                 parts = parts.split(" -> ")[1].strip('"')
             rel_path = Path(parts)
+            if any(part in IGNORE_PATTERNS or part.startswith(".nagare") for part in rel_path.parts):
+                continue
             dirty_files.add(rel_path)
 
             if self.on_dirty:
@@ -57,7 +59,7 @@ class _WatchdogHandler(FileSystemEventHandler):
 
     def _should_ignore(self, path: Path) -> bool:
         for part in path.parts:
-            if part in IGNORE_PATTERNS or part.endswith(".tmp") or part.endswith(".swp"):
+            if part in IGNORE_PATTERNS or part.startswith(".nagare") or part.endswith(".tmp") or part.endswith(".swp"):
                 return True
         return False
 

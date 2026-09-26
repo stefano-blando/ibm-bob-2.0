@@ -35,7 +35,7 @@ class ScopeSynthesizer:
 
     def _should_ignore(self, path: Path) -> bool:
         for part in path.parts:
-            if part in IGNORE_DIRS:
+            if part in IGNORE_DIRS or part.startswith(".nagare"):
                 return True
         return False
 
