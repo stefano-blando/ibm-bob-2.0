@@ -61,7 +61,7 @@ class NagareRunner:
                 live.update(self.telemetry.render_hud(snapshot))
 
                 if not self.dry_run:
-                    cmd = self.agent_cmd or ["bob", "run", "--auto-approve", task_prompt]
+                    cmd = self.agent_cmd or ["bob", "run", "--trust", task_prompt]
                     try:
                         proc = subprocess.Popen(cmd, cwd=self.repo_root)
                         while proc.poll() is None:
