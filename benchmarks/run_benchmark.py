@@ -61,6 +61,18 @@ def main():
         results.append(res3)
         console.print(f"  [green]✓[/green] Avg Latency: [bold]{res3.avg_latency_ms:.2f} ms[/bold] (P99: {res3.p99_latency_ms:.2f} ms) — Blocked: {res3.corruptions_blocked}/50")
 
+    ts_repo = Path("/tmp/ts_benchmark_repo")
+    if ts_repo.exists():
+        console.print("[yellow]Running Scenario 4:[/yellow] Industrial React/Redux Full-Stack (src/store.js Guard) (50 iterations)...")
+        res4 = run_micro_rollback_benchmark(
+            repo_root=ts_repo,
+            target_file=Path("src/store.js"),
+            iterations=50,
+            scenario_name="Industrial React/Redux (Central Store Guard)"
+        )
+        results.append(res4)
+        console.print(f"  [green]✓[/green] Avg Latency: [bold]{res4.avg_latency_ms:.2f} ms[/bold] (P99: {res4.p99_latency_ms:.2f} ms) — Blocked: {res4.corruptions_blocked}/50")
+
     # Render summary table
     table = Table(title="[bold green]Empirical Benchmark Results Summary[/bold green]", expand=True)
     table.add_column("Scenario", style="cyan")

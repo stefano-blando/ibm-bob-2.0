@@ -1,6 +1,6 @@
 # 📊 Nagare Governor Empirical Benchmark Report
 
-> **Generated on:** 2026-09-26T23:29:09.740520  
+> **Generated on:** 2026-09-26T23:50:37.961583  
 > **Environment:** Linux x86_64, Python 3.12, Kernel Inotify + Git Telemetry  
 
 ---
@@ -9,9 +9,10 @@
 
 | Benchmark Scenario | Iterations | Avg Latency | Median Latency | P99 Latency | Corruptions Blocked | Safety Rate |
 |---|---|---|---|---|---|---|
-| **Demo App (SQL Schema Mutation)** | 50 | **6.63 ms** | 6.61 ms | 8.65 ms | 50/50 | **100.0%** |
-| **Industrial 80+ Files (Alembic Guard)** | 50 | **6.40 ms** | 6.20 ms | 10.91 ms | 50/50 | **100.0%** |
-| **Industrial 80+ Files (Secrets/Config Guard)** | 50 | **6.40 ms** | 6.29 ms | 8.87 ms | 50/50 | **100.0%** |
+| **Demo App (SQL Schema Mutation)** | 50 | **6.99 ms** | 6.81 ms | 9.20 ms | 50/50 | **100.0%** |
+| **Industrial 80+ Files (Alembic Guard)** | 50 | **7.11 ms** | 7.09 ms | 9.07 ms | 50/50 | **100.0%** |
+| **Industrial 80+ Files (Secrets/Config Guard)** | 50 | **6.89 ms** | 6.73 ms | 8.55 ms | 50/50 | **100.0%** |
+| **Industrial React/Redux (Central Store Guard)** | 50 | **6.47 ms** | 6.46 ms | 8.71 ms | 50/50 | **100.0%** |
 
 ---
 
