@@ -39,6 +39,7 @@ class NagareTelemetry:
         )
 
     def export_session_report(self, snapshot: TelemetrySnapshot) -> Path:
+        self.sessions_dir.mkdir(parents=True, exist_ok=True)
         timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"nagare_session_{timestamp_str}.md"
         out_path = self.sessions_dir / filename

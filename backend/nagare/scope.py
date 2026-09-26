@@ -6,14 +6,23 @@ import networkx as nx
 from nagare.models import ScopeContract
 
 KNOWN_SENSITIVE_PATTERNS = [
-    r".*database/schema\.sql$",
-    r".*database/migrations/.*",
-    r".*core/config\.py$",
-    r".*core/secrets.*",
+    r".*(database|db)/schema\.(sql|prisma)$",
+    r".*(database|db)/migrations/.*",
+    r".*alembic\.ini$",
+    r".*core/(config|secrets)\.py$",
+    r".*settings/(production|secrets)\.py$",
     r".*\.env.*",
     r".*package-lock\.json$",
     r".*poetry\.lock$",
+    r".*pnpm-lock\.yaml$",
+    r".*cargo\.lock$",
 ]
+
+COMMON_STOPWORDS = {
+    "app", "src", "lib", "test", "tests", "file", "files", "code", "repo", "add",
+    "the", "for", "with", "and", "into", "from", "refactor", "implement", "update",
+    "fix", "create", "delete", "make", "change", "module"
+}
 
 IGNORE_DIRS = {".git", ".venv", "venv", "env", "__pycache__", ".pytest_cache", "node_modules", "bob_sessions"}
 
@@ -72,13 +81,22 @@ class ScopeSynthesizer:
                 if any(re.match(pattern, rel_str) for pattern in KNOWN_SENSITIVE_PATTERNS):
                     restricted.add(rel)
 
-        # Match prompt keywords to seed files
-        keywords = re.findall(r"\b[a-zA-Z]{3,}\b", task_prompt.lower())
+        # 1. Check explicit path mentions in prompt
         seed_nodes: List[Path] = []
         for node in self.graph.nodes:
-            node_str = str(node).lower()
-            if any(kw in node_str for kw in keywords):
+            if str(node) in task_prompt or (node.stem in task_prompt and node.stem not in COMMON_STOPWORDS):
                 seed_nodes.append(node)
+
+        # 2. If no explicit path, match non-stopword keywords
+        if not seed_nodes:
+            keywords = [
+                kw for kw in re.findall(r"\b[a-zA-Z]{3,}\b", task_prompt.lower())
+                if kw not in COMMON_STOPWORDS
+            ]
+            for node in self.graph.nodes:
+                node_str = str(node).lower()
+                if any(kw in node_str for kw in keywords):
+                    seed_nodes.append(node)
 
         # Add 1-hop reachable nodes to permitted scope
         for seed in seed_nodes:
