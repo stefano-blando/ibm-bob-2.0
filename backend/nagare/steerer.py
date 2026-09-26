@@ -6,9 +6,10 @@ from typing import Optional, Dict
 from nagare.models import ScopeContract, ViolationEvent, ViolationAction
 
 class MicroSteerer:
-    def __init__(self, repo_root: Path, contract: ScopeContract):
+    def __init__(self, repo_root: Path, contract: ScopeContract, debounce_seconds: float = 0.15):
         self.repo_root = Path(repo_root).resolve()
         self.contract = contract
+        self.debounce_seconds = debounce_seconds
         self._last_revert: Dict[Path, float] = {}
 
     def is_dirty(self, rel: Path) -> bool:
@@ -48,9 +49,9 @@ class MicroSteerer:
         rel = Path(relative_path)
         full_path = self.repo_root / rel
 
-        # Debounce rapid duplicate events (within 100ms)
+        # Debounce rapid duplicate events
         now = time.time()
-        if rel in self._last_revert and (now - self._last_revert[rel]) < 0.15:
+        if self.debounce_seconds > 0.0 and rel in self._last_revert and (now - self._last_revert[rel]) < self.debounce_seconds:
             return None
 
         # If file is not dirty, no rollback needed
