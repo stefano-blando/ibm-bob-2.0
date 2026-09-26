@@ -41,12 +41,24 @@ class ViolationEvent:
 
 @dataclass
 class TelemetrySnapshot:
-    session_id: str
-    task_prompt: str
+    task_intent: str = ""
+    status: str = "INITIALIZED"
+    elapsed_seconds: float = 0.0
+    files_modified: Set[Path] = field(default_factory=set)
+    violations: List[ViolationEvent] = field(default_factory=list)
+    tokens_estimate: int = 0
+    bobcoins_cost: float = 0.0
+    session_id: str = ""
+    task_prompt: str = ""
     permitted_count: int = 0
     restricted_count: int = 0
-    violations: List[ViolationEvent] = field(default_factory=list)
     total_rollbacks: int = 0
+
+    def __post_init__(self):
+        if not self.task_intent and self.task_prompt:
+            self.task_intent = self.task_prompt
+        elif not self.task_prompt and self.task_intent:
+            self.task_prompt = self.task_intent
 
     def record_violation(self, event: ViolationEvent) -> None:
         self.violations.append(event)
