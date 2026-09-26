@@ -1,0 +1,204 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" width="100%" height="100%" style="background-color: #0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+    <linearGradient id="cardBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#161f30" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="steerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#f97316" />
+    </linearGradient>
+    <linearGradient id="safeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+    
+    <!-- Glow Filters -->
+    <filter id="glowCyan" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="glowOrange" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Arrow Marker -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#38bdf8" />
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#ef4444" />
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#10b981" />
+    </marker>
+  </defs>
+
+  <!-- Canvas Border -->
+  <rect x="15" y="15" width="1170" height="650" rx="16" fill="none" stroke="#1e293b" stroke-width="2"/>
+
+  <!-- Header Banner -->
+  <text x="60" y="65" font-size="28" font-weight="800" fill="url(#headerGrad)" letter-spacing="1">🌊 NAGARE GOVERNOR</text>
+  <text x="390" y="64" font-size="14" font-weight="600" fill="#94a3b8">|  In-Flight Active Steering &amp; Micro-Rollback Engine for IBM Bob 2.0</text>
+  <rect x="1000" y="44" width="140" height="28" rx="14" fill="#06b6d4" fill-opacity="0.15" stroke="#06b6d4" stroke-width="1"/>
+  <text x="1070" y="62" font-size="11" font-weight="700" fill="#38bdf8" text-anchor="middle">SUB-15ms LATENCY</text>
+
+  <!-- ==================== COLUMN 1: INTENT & SYNTHESIS ==================== -->
+  <g transform="translate(60, 110)">
+    <!-- Outer Card -->
+    <rect x="0" y="0" width="310" height="230" rx="12" fill="url(#cardBg)" stroke="#334155" stroke-width="1.5"/>
+    <rect x="15" y="15" width="280" height="34" rx="6" fill="#1e293b"/>
+    <circle cx="32" cy="32" r="6" fill="#38bdf8"/>
+    <text x="48" y="37" font-size="13" font-weight="700" fill="#f8fafc">1. Task Intent &amp; AST Analysis</text>
+
+    <!-- Content -->
+    <text x="20" y="80" font-size="12" font-weight="600" fill="#94a3b8">Input: Developer Prompt / Issue</text>
+    <rect x="20" y="92" width="270" height="32" rx="6" fill="#0f172a" stroke="#1e293b"/>
+    <text x="30" y="112" font-size="11" font-family="monospace" fill="#38bdf8">"Add token rate limiter to auth.py"</text>
+
+    <text x="20" y="150" font-size="12" font-weight="600" fill="#94a3b8">Dynamic Dependency Discovery:</text>
+    <text x="30" y="172" font-size="11" fill="#cbd5e1">• Python AST &amp; TS/JS ES6 import resolution</text>
+    <text x="30" y="192" font-size="11" fill="#cbd5e1">• 1-Hop Reachable Call Graph (NetworkX)</text>
+    <text x="30" y="212" font-size="11" fill="#cbd5e1">• Strict Protected Patterns (DB, Config, Locks)</text>
+  </g>
+
+  <!-- Contract Card -->
+  <g transform="translate(60, 370)">
+    <rect x="0" y="0" width="310" height="150" rx="12" fill="url(#cardBg)" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="4 2"/>
+    <rect x="15" y="15" width="280" height="30" rx="6" fill="#06b6d4" fill-opacity="0.12"/>
+    <text x="155" y="35" font-size="12" font-weight="700" fill="#38bdf8" text-anchor="middle">Dynamic Scope Contract</text>
+
+    <text x="25" y="70" font-size="11" font-weight="700" fill="#10b981">✓ PERMITTED MANIFOLD:</text>
+    <text x="35" y="88" font-size="10" font-family="monospace" fill="#94a3b8">• demo_app/api/routes/auth.py</text>
+    <text x="35" y="104" font-size="10" font-family="monospace" fill="#94a3b8">• demo_app/services/user_service.py</text>
+
+    <text x="25" y="124" font-size="11" font-weight="700" fill="#ef4444">✕ RESTRICTED MANIFOLD:</text>
+    <text x="35" y="140" font-size="10" font-family="monospace" fill="#94a3b8">• schema.sql, config.py, .env*</text>
+  </g>
+
+  <!-- Arrow: Synth to Contract -->
+  <path d="M 215 340 L 215 365" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- ==================== COLUMN 2: EXECUTION & INOTIFY ==================== -->
+  <g transform="translate(440, 110)">
+    <!-- Bob Subprocess Box -->
+    <rect x="0" y="0" width="320" height="230" rx="12" fill="url(#cardBg)" stroke="#3b82f6" stroke-width="1.5"/>
+    <rect x="15" y="15" width="290" height="34" rx="6" fill="#1e293b"/>
+    <circle cx="32" cy="32" r="6" fill="#3b82f6"/>
+    <text x="48" y="37" font-size="13" font-weight="700" fill="#f8fafc">2. IBM Bob 2.0 CLI Runtime</text>
+
+    <text x="20" y="75" font-size="11" font-family="monospace" fill="#38bdf8">bob run --accept-license --trust</text>
+    <text x="20" y="100" font-size="12" fill="#cbd5e1">Autonomous Auto-Mode Agent Loop:</text>
+    <text x="30" y="122" font-size="11" fill="#94a3b8">• High-throughput tool calling</text>
+    <text x="30" y="142" font-size="11" fill="#94a3b8">• In-flight filesystem disk writes</text>
+    <text x="30" y="162" font-size="11" fill="#94a3b8">• Granite / watsonx reasoning cycle</text>
+
+    <!-- Status badge -->
+    <rect x="20" y="185" width="280" height="28" rx="6" fill="#3b82f6" fill-opacity="0.12" stroke="#3b82f6"/>
+    <text x="160" y="203" font-size="11" font-weight="700" fill="#60a5fa" text-anchor="middle">Supervised Child Subprocess (PID)</text>
+  </g>
+
+  <!-- Inotify Watcher Box -->
+  <g transform="translate(440, 370)">
+    <rect x="0" y="0" width="320" height="150" rx="12" fill="url(#cardBg)" stroke="#10b981" stroke-width="1.5"/>
+    <rect x="15" y="15" width="290" height="30" rx="6" fill="#10b981" fill-opacity="0.12"/>
+    <text x="160" y="35" font-size="12" font-weight="700" fill="#34d399" text-anchor="middle">Linux Inotify &amp; Git Observer</text>
+
+    <text x="25" y="70" font-size="12" fill="#cbd5e1">Kernel Event Detection: <tspan fill="#34d399" font-weight="700">&lt; 2.0 ms</tspan></text>
+    <text x="25" y="92" font-size="11" fill="#94a3b8">• Watchdog filesystem handler</text>
+    <text x="25" y="112" font-size="11" fill="#94a3b8">• Non-blocking dirty file polling</text>
+    <text x="25" y="132" font-size="11" fill="#94a3b8">• Match vs Active ScopeContract</text>
+  </g>
+
+  <!-- Arrow: Bob writes to Inotify -->
+  <path d="M 600 340 L 600 365" stroke="#10b981" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+  <!-- ==================== COLUMN 3: ACTIVE STEERING & TELEMETRY ==================== -->
+  <g transform="translate(830, 110)">
+    <!-- Micro-Steerer Box -->
+    <rect x="0" y="0" width="310" height="230" rx="12" fill="url(#cardBg)" stroke="#ef4444" stroke-width="1.5"/>
+    <rect x="15" y="15" width="280" height="34" rx="6" fill="#1e293b"/>
+    <circle cx="32" cy="32" r="6" fill="#ef4444"/>
+    <text x="48" y="37" font-size="13" font-weight="700" fill="#f8fafc">3. Micro-Steerer Engine</text>
+
+    <text x="20" y="75" font-size="11" font-weight="700" fill="#f87171">OUT-OF-SCOPE INTERCEPTION:</text>
+    <rect x="20" y="85" width="270" height="48" rx="6" fill="#ef4444" fill-opacity="0.1" stroke="#ef4444"/>
+    <text x="30" y="103" font-size="10" font-family="monospace" fill="#fca5a5">git checkout HEAD -- &lt;forbidden&gt;</text>
+    <text x="30" y="122" font-size="11" font-weight="700" fill="#ef4444">Latency: 6.47 ms - 7.11 ms</text>
+
+    <text x="20" y="155" font-size="11" font-weight="700" fill="#fb923c">IN-FLIGHT STEERING DIRECTIVE:</text>
+    <text x="25" y="175" font-size="10" fill="#cbd5e1">• Reverts rogue mutation to pristine state</text>
+    <text x="25" y="195" font-size="10" fill="#cbd5e1">• Injects constraint prompt into agent loop</text>
+    <text x="25" y="215" font-size="10" fill="#cbd5e1">• Zero agent crashes or manual aborts</text>
+  </g>
+
+  <!-- Flight Recorder Web HUD -->
+  <g transform="translate(830, 370)">
+    <rect x="0" y="0" width="310" height="150" rx="12" fill="url(#cardBg)" stroke="#8b5cf6" stroke-width="1.5"/>
+    <rect x="15" y="15" width="280" height="30" rx="6" fill="#8b5cf6" fill-opacity="0.12"/>
+    <text x="155" y="35" font-size="12" font-weight="700" fill="#c084fc" text-anchor="middle">Flight Recorder &amp; Audit Logs</text>
+
+    <text x="25" y="70" font-size="11" fill="#cbd5e1">• Live WebSocket Web HUD (<tspan fill="#38bdf8">localhost:8765</tspan>)</text>
+    <text x="25" y="90" font-size="11" fill="#cbd5e1">• Real-time Vis.js AST Topology Graph</text>
+    <text x="25" y="110" font-size="11" fill="#cbd5e1">• Rich Terminal HUD with real-time stats</text>
+    <text x="25" y="130" font-size="11" fill="#cbd5e1">• Hackathon Audit Logs in <tspan fill="#38bdf8">bob_sessions/</tspan></text>
+  </g>
+
+  <!-- Cross-Connecting Arrows -->
+  <!-- Contract to Inotify -->
+  <path d="M 370 445 L 435 445" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="402" y="435" font-size="9" fill="#94a3b8" text-anchor="middle">Bounds</text>
+
+  <!-- Inotify to Steerer (Violation detected) -->
+  <path d="M 760 420 L 795 420 L 795 240 L 825 240" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 2" marker-end="url(#arrowRed)"/>
+  <text x="795" y="325" font-size="9" font-weight="700" fill="#ef4444" transform="rotate(-90 795 325)" text-anchor="middle">Violation Alert (&lt;2ms)</text>
+
+  <!-- Steerer to Bob (Micro-Rollback & Active Steering) -->
+  <path d="M 830 180 L 765 180" stroke="#f97316" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="798" y="170" font-size="9" font-weight="700" fill="#f97316" text-anchor="middle">Steer</text>
+
+  <!-- Steerer to Flight Recorder -->
+  <path d="M 985 340 L 985 365" stroke="#8b5cf6" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- ==================== FOOTER METRICS BAR ==================== -->
+  <g transform="translate(60, 545)">
+    <rect x="0" y="0" width="1080" height="90" rx="10" fill="#0f172a" stroke="#1e293b"/>
+    
+    <g transform="translate(40, 20)">
+      <text x="0" y="18" font-size="11" font-weight="600" fill="#94a3b8">ROLLBACK SPEED</text>
+      <text x="0" y="48" font-size="24" font-weight="800" fill="#38bdf8">6.7 ms</text>
+      <text x="80" y="48" font-size="11" fill="#64748b">mean latency</text>
+    </g>
+
+    <line x1="280" y1="15" x2="280" y2="75" stroke="#1e293b"/>
+
+    <g transform="translate(320, 20)">
+      <text x="0" y="18" font-size="11" font-weight="600" fill="#94a3b8">P99 LATENCY</text>
+      <text x="0" y="48" font-size="24" font-weight="800" fill="#f59e0b">&lt; 9.5 ms</text>
+      <text x="95" y="48" font-size="11" fill="#64748b">predictable ceiling</text>
+    </g>
+
+    <line x1="560" y1="15" x2="560" y2="75" stroke="#1e293b"/>
+
+    <g transform="translate(600, 20)">
+      <text x="0" y="18" font-size="11" font-weight="600" fill="#94a3b8">INTEGRITY SUCCESS</text>
+      <text x="0" y="48" font-size="24" font-weight="800" fill="#10b981">100.0%</text>
+      <text x="95" y="48" font-size="11" fill="#64748b">200/200 protected</text>
+    </g>
+
+    <line x1="840" y1="15" x2="840" y2="75" stroke="#1e293b"/>
+
+    <g transform="translate(880, 20)">
+      <text x="0" y="18" font-size="11" font-weight="600" fill="#94a3b8">POLYGLOT SUPPORT</text>
+      <text x="0" y="48" font-size="22" font-weight="800" fill="#c084fc">Python + TS/JS</text>
+      <text x="0" y="62" font-size="10" fill="#64748b">React, Node, FastAPI</text>
+    </g>
+  </g>
+</svg>
