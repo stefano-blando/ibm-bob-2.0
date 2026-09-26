@@ -2,17 +2,63 @@ import time
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Optional, Dict
 from nagare.models import ScopeContract, ViolationEvent, ViolationAction
 
 class MicroSteerer:
     def __init__(self, repo_root: Path, contract: ScopeContract):
         self.repo_root = Path(repo_root).resolve()
         self.contract = contract
+        self._last_revert: Dict[Path, float] = {}
 
-    def revert_and_steer(self, relative_path: Path) -> ViolationEvent:
+    def is_dirty(self, rel: Path) -> bool:
+        full_path = self.repo_root / rel
+        if not full_path.exists():
+            return False
+
+        # Check unstaged diff
+        diff_unstaged = subprocess.run(
+            ["git", "diff", "--quiet", "--", str(rel)],
+            cwd=self.repo_root
+        ).returncode != 0
+        if diff_unstaged:
+            return True
+
+        # Check staged diff
+        diff_staged = subprocess.run(
+            ["git", "diff", "--cached", "--quiet", "--", str(rel)],
+            cwd=self.repo_root
+        ).returncode != 0
+        if diff_staged:
+            return True
+
+        # Check untracked
+        res_untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard", str(rel)],
+            cwd=self.repo_root,
+            capture_output=True,
+            text=True
+        )
+        if res_untracked.stdout.strip():
+            return True
+
+        return False
+
+    def revert_and_steer(self, relative_path: Path) -> Optional[ViolationEvent]:
         rel = Path(relative_path)
         full_path = self.repo_root / rel
-        
+
+        # Debounce rapid duplicate events (within 100ms)
+        now = time.time()
+        if rel in self._last_revert and (now - self._last_revert[rel]) < 0.15:
+            return None
+
+        # If file is not dirty, no rollback needed
+        if not self.is_dirty(rel):
+            return None
+
+        self._last_revert[rel] = now
+
         # Check if tracked in git
         res = subprocess.run(
             ["git", "ls-files", "--error-unmatch", str(rel)],
@@ -47,6 +93,6 @@ class MicroSteerer:
         return ViolationEvent(
             file_path=rel,
             action=ViolationAction.ROLLED_BACK,
-            timestamp=time.time(),
+            timestamp=now,
             steering_prompt=prompt
         )

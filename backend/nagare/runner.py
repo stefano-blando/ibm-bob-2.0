@@ -41,8 +41,9 @@ class NagareRunner:
         def on_dirty_file(file_path: Path, is_restricted: bool):
             if is_restricted:
                 event = steerer.revert_and_steer(file_path)
-                snapshot.record_violation(event)
-                snapshot.status = "STEERING_APPLIED"
+                if event is not None:
+                    snapshot.record_violation(event)
+                    snapshot.status = "STEERING_APPLIED"
             else:
                 snapshot.files_modified.add(file_path)
                 if snapshot.status != "STEERING_APPLIED":
