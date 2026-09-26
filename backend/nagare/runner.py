@@ -11,16 +11,21 @@ from nagare.steerer import MicroSteerer
 from nagare.telemetry import NagareTelemetry
 
 def _load_env_file(repo_root: Path):
-    env_file = repo_root / ".env"
-    if env_file.exists():
-        for line in env_file.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                k = k.strip()
-                v = v.strip().strip('"').strip("'")
-                if k and k not in os.environ:
-                    os.environ[k] = v
+    candidates = [
+        repo_root / ".env",
+        Path.cwd() / ".env",
+        Path(__file__).resolve().parent.parent.parent / ".env"
+    ]
+    for env_file in candidates:
+        if env_file.exists():
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip('"').strip("'")
+                    if k and k not in os.environ:
+                        os.environ[k] = v
 
 class NagareRunner:
     def __init__(
