@@ -37,10 +37,12 @@ When developers unleash autonomous coding agents in unsupervised mode (`bob run 
 
 Nagare Governor runs as a real-time parent supervisor around IBM Bob:
 
-- 🧠 **Dynamic Polyglot AST Scope Synthesizer**: Parses Python AST and TypeScript/JavaScript ES6 import graphs (`networkx`) to calculate the permitted mathematical manifold (target modules + 1-hop reachable call paths), while strictly isolating sensitive files (`schema.sql`, `config.py`, `.env*`, lockfiles).
+- 🧠 **Dynamic Polyglot AST Scope Synthesizer**: Parses Python AST and TypeScript/JavaScript ES6 import graphs (`networkx`) to calculate the permitted mathematical manifold (target modules + 1-hop reachable call paths). Detects dynamic runtime imports (`importlib`, `import(...)`, `require(...)`) and supports repository-level scoping overrides via `nagare.json`.
 - ⚡ **Sub-2ms Linux Inotify Observer**: Uses kernel-level Linux filesystem notifications (`watchdog`) combined with non-blocking `git status --porcelain` reconciliation to detect mutations the instant bytes hit disk.
-- 🔄 **Sub-15ms Micro-Rollback (`git checkout HEAD -- <file>`)**: Before the agent executes its next reasoning turn, Nagare atomically reverts the forbidden mutation to clean `HEAD` state without halting or aborting the agent.
-- 🎯 **Localized Steering Injection**: Synthesizes structured corrective feedback (`[NAGARE GOVERNOR INTERCEPTION]`) explaining exactly which file was reverted and where to implement the solution.
+- 🔄 **Lockless Sub-15ms Micro-Rollback**: Reads blobs directly from the Git object database (`git show HEAD:<file>`) and overwrites dirty files in $< 1\text{ms}$, completely bypassing `.git/index.lock` contention before attempting staging reconciliation.
+- 🎯 **Multi-Layered Cognitive Feedback (MCP + In-Repo Directives)**:
+  - Generates `.nagare_directive.md` in the workspace root, binding directly to `AGENTS.md` rules.
+  - Native Model Context Protocol (MCP) stdio server (`nagare mcp`) allowing agents like IBM Bob to query permissions directly (`nagare_check_permission`).
 - 🎛️ **Dual-Mode Flight Recorder (Terminal HUD + Web Dashboard)**: Real-time rich terminal interface and a full-featured FastAPI + WebSocket live web dashboard at `http://localhost:8765` featuring a dynamic Vis.js AST topology network graph.
 - 📊 **Automated Audit Compliance**: Generates timestamped Markdown reports in `bob_sessions/` compliant with hackathon submission guidelines.
 
@@ -158,7 +160,18 @@ nagare benchmark --repo .
 python benchmarks/run_benchmark.py
 ```
 
-### 6. Passive Repository Watcher
+### 6. Connect Nagare to IBM Bob via Model Context Protocol (MCP)
+
+Register Nagare Governor as a native MCP boundary provider in Bob:
+
+```bash
+# Register Nagare MCP server in Bob CLI
+bob mcp add nagare python3 -m nagare.mcp_server
+
+# Bob can now proactively call nagare_check_permission before attempting file writes!
+```
+
+### 7. Passive Repository Watcher
 
 Run Nagare in standalone watcher mode to govern any active agent or editor:
 
