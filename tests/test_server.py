@@ -34,3 +34,34 @@ def test_web_server_endpoints(tmp_path):
     telem = res_telem.json()
     assert "status" in telem
     assert "total_rollbacks" in telem
+
+
+def test_contract_preview_and_evidence(tmp_path):
+    (tmp_path / "api").mkdir()
+    (tmp_path / "api" / "auth.py").write_text("import os\n")
+    (tmp_path / "db").mkdir()
+    (tmp_path / "db" / "schema.sql").write_text("CREATE TABLE users (id INT);\n")
+    client = TestClient(create_app(repo_root=tmp_path))
+
+    # No live session and no prompt: nothing to show.
+    assert client.get("/api/contract").status_code == 404
+
+    preview = client.get("/api/contract?prompt=Add%20rate%20limiting%20to%20api/auth.py").json()
+    assert preview["live"] is False
+    assert "api/auth.py" in preview["permitted"]
+    # Non-code protected files (not import-graph nodes) must still be listed.
+    assert "db/schema.sql" in preview["restricted"]
+
+    evidence = client.get("/api/evidence").json()
+    assert evidence["summary"] is None and evidence["benchmarks"] is None
+    assert evidence["case_study"] == {"ungoverned_diff": "", "governed_diff": ""}
+
+
+def test_scripted_demo_endpoint_runs_real_scenario(tmp_path):
+    client = TestClient(create_app(repo_root=tmp_path))
+    res = client.post("/api/demo/scripted?delay=0.2")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["passed"], data["checks"]
+    labels = [c["label"] for c in data["checks"]]
+    assert "hook denied write_file on schema.sql" in labels

@@ -2,7 +2,7 @@
 
 > **IBM Bob 2.0 Hackathon (lablab.ai)** · **Team**: Nagare (流れ — Flow State) · **License**: Apache-2.0
 
-[![Tests](https://img.shields.io/badge/pytest-63%20passed-emerald)](tests/)
+[![Tests](https://img.shields.io/badge/pytest-65%20passed-emerald)](tests/)
 [![Live Bob runs](https://img.shields.io/badge/live%20Bob%20eval-40%20runs%20(100%25%20safe)-blue)](experiments/results/live_bob_20260927/README.md)
 [![Exposure window](https://img.shields.io/badge/write→restore-~9ms%20median-cyan)](benchmarks/BENCHMARK_REPORT.md)
 
@@ -68,10 +68,12 @@ regression tests.
 ```bash
 python scripts/demo_scripted.py
 ```
-A scripted rogue agent edits `auth.py`, adds a test, runs `sed -i` on `schema.sql`, overwrites
-`core/config.py`, drops a new file at the repo root — while the developer has uncommitted WIP.
-Result: 7/7 checks pass (in-scope work kept, protected files restored, rogue file quarantined, developer
-WIP untouched).
+A scripted rogue agent edits `auth.py`, sends Bob-shaped `write_file` calls through the real PreToolUse
+hook (one to `schema.sql`, one smuggling `CREATE TABLE` into `auth.py`), adds a test, runs `sed -i` on
+`schema.sql`, overwrites `core/config.py`, drops a new file at the repo root — while the developer has
+uncommitted WIP. Result: 9/9 checks pass (in-scope work kept, both hook writes denied, protected files
+restored, rogue file quarantined, developer WIP untouched). The same scenario runs from the Flight
+Recorder's **Run scripted rogue agent** button, streaming its real events to the dashboard.
 
 ### Benchmarks ([report](benchmarks/BENCHMARK_REPORT.md), on throwaway clones)
 | Measurement | Median | Worst observed | Outcome |
@@ -107,7 +109,7 @@ Prerequisites: Linux, Python 3.12+, Git, IBM Bob Shell (`bob`), `BOB_API_KEY` in
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e "backend[dev]"
 
-pytest -q                                    # 63 tests
+pytest -q                                    # 65 tests
 python scripts/demo_scripted.py              # deterministic bypass demo, no Bobcoins
 
 nagare scope "Add rate limiting to demo_app/api/routes/auth.py. Do not touch user_service."
@@ -141,7 +143,8 @@ Debug aid: `NAGARE_HOOK_LOG=/tmp/hooks.jsonl nagare run …` records every raw B
 | [`observer`](backend/nagare/observer.py) / [`steerer`](backend/nagare/steerer.py) | inotify + git reconciliation; restore / quarantine / warn |
 | [`runner`](backend/nagare/runner.py) | Session orchestration, Bob process, cost extraction |
 | [`mcp_server`](backend/nagare/mcp_server.py) | MCP tools backed by the live contract |
-| [`server`](backend/nagare/server.py) | Flight Recorder: tails the live session's events over WebSocket |
+| [`server`](backend/nagare/server.py) | Flight Recorder: streams the live contract, both layers' events and working-tree changes over WebSocket; evidence view reads the committed result files |
+| [`demo`](backend/nagare/demo.py) | Deterministic rogue-agent scenario (CLI script and dashboard button) |
 
 ## Known limitations
 
