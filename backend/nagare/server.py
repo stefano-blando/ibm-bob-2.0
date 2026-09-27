@@ -109,6 +109,11 @@ def create_app(repo_root: Path = Path(".")) -> FastAPI:
                     if active:
                         offset, last_dirty = 0, None
                         state["preexisting"] = await asyncio.to_thread(_dirty_files, root)
+                    elif was_active:
+                        # Session just ended: drain events written right before the contract was removed.
+                        events, offset = await asyncio.to_thread(read_events, root, offset)
+                        for event in events:
+                            await manager.broadcast({"type": "intervention", **event.to_dict()})
                     await manager.broadcast(session_message())
                     was_active = active
                 if active:
