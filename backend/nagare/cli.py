@@ -13,7 +13,7 @@ def main():
     )
     parser.add_argument(
         "command",
-        choices=["run", "watch", "ui", "mcp", "benchmark", "hook", "install-hooks", "uninstall-hooks", "scope"],
+        choices=["run", "watch", "ui", "mcp", "benchmark", "hook", "install-hooks", "uninstall-hooks", "scope", "status"],
         help="Command to execute",
     )
     parser.add_argument("prompt", nargs="?", default="", help="Task prompt for the agent")
@@ -72,14 +72,90 @@ def main():
         snapshot = runner.run_governed(task_prompt=args.prompt or "Passive repo monitoring")
         print(f"[Nagare] Monitoring stopped. Interventions: {snapshot.total_interventions}")
     elif args.command == "scope":
+        from rich.console import Console
+        from rich.tree import Tree
+        from rich.panel import Panel
+        from rich.table import Table
         from nagare.scope import ScopeSynthesizer
-        contract = ScopeSynthesizer(repo_path).synthesize_scope(args.prompt or "Current Task", policy=policy)
-        print("Permitted:")
+
+        console = Console()
+        synth = ScopeSynthesizer(repo_path)
+        contract = synth.synthesize_scope(args.prompt or "Current Task", policy=policy)
+
+        tree = Tree(f"[bold cyan]📁 {repo_path.name}[/bold cyan] [dim](AST Import Manifold & Write Contract)[/dim]")
+        lane = tree.add(f"[bold green]✓ Permitted Lane ({len(contract.permitted_paths)} files)[/bold green] [dim]-- Target & 1-Hop AST Imports[/dim]")
         for p in sorted(contract.permitted_paths):
-            print(f"  ✓ {p.as_posix()}")
-        print("Protected:")
+            node = lane.add(f"[green]✓ {p.as_posix()}[/green]")
+            if p in synth.graph:
+                deps = [d.as_posix() for d in synth.graph.successors(p) if d != p]
+                for d in deps[:4]:
+                    node.add(f"[dim green]↳ imports [cyan]{d}[/cyan][/dim green]")
+
+        shield = tree.add(f"[bold red]🛡 Protected Core ({len(contract.restricted_paths)} files)[/bold red] [dim]-- Blocked at Hook Boundary & Restored at FS[/dim]")
         for p in sorted(contract.restricted_paths):
-            print(f"  ✕ {p.as_posix()}")
+            reason = "database schema" if p.suffix == ".sql" or "schema" in p.name else ("config / secret" if "config" in p.name or "env" in p.name else "protected asset")
+            shield.add(f"[red]✕ {p.as_posix()}[/red] [dim yellow]({reason})[/dim yellow]")
+
+        summary = Table.grid(padding=(0, 2))
+        summary.add_column("Key", style="bold white")
+        summary.add_column("Val", style="cyan")
+        summary.add_row("Task Intent:", f"[yellow]{args.prompt or 'Current Task'}[/yellow]")
+        summary.add_row("Policy:", f"[bold]{policy.value}[/bold]")
+        summary.add_row("Dual Boundary:", "Layer 1: PreToolUse Hooks (deny) · Layer 2: inotify (revert)")
+
+        console.print()
+        console.print(Panel(summary, title="🌊 [bold]Nagare Write Contract[/bold]", border_style="cyan"))
+        console.print(Panel(tree, border_style="dim", subtitle=f"[dim]{len(contract.permitted_paths)} permitted · {len(contract.restricted_paths)} protected[/dim]"))
+        console.print()
+
+    elif args.command == "status":
+        from rich.console import Console
+        from rich.table import Table
+        from rich.panel import Panel
+        import subprocess
+        from nagare.paths import CONTRACT_FILE
+
+        console = Console()
+        table = Table(title="🌊 Nagare Git Safety & Governance Ledger", border_style="blue", show_header=True)
+        table.add_column("System / Component", style="bold white")
+        table.add_column("Status / Safety Guarantee", style="cyan")
+
+        try:
+            head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=repo_path, capture_output=True, text=True).stdout.strip()
+            branch = subprocess.run(["git", "branch", "--show-current"], cwd=repo_path, capture_output=True, text=True).stdout.strip()
+            table.add_row("Git Repository", f"[green]{branch}[/green] @ [bold yellow]{head}[/bold yellow]")
+        except Exception:
+            table.add_row("Git Repository", "[dim]Unknown[/dim]")
+
+        try:
+            res = subprocess.run(["git", "status", "--porcelain=v1"], cwd=repo_path, capture_output=True, text=True)
+            dirty_lines = [l for l in res.stdout.strip().splitlines() if l and not l.startswith("?? .nagare")]
+            if len(dirty_lines) == 0:
+                table.add_row("Working Tree", "[green]Clean (Session baseline ready)[/green]")
+            else:
+                table.add_row("Working Tree", f"[yellow]{len(dirty_lines)} dirty files (Session Baseline protected)[/yellow]")
+        except Exception:
+            pass
+
+        contract_file = repo_path / CONTRACT_FILE
+        if contract_file.exists():
+            table.add_row("Active Contract", f"[bold green]ACTIVE[/bold green] ({contract_file.name})")
+        else:
+            table.add_row("Active Contract", "[dim]Idle (No active agent session)[/dim]")
+
+        settings_file = repo_path / ".bob" / "settings.json"
+        if settings_file.exists() and "nagare hook" in settings_file.read_text():
+            table.add_row("IBM Bob Hooks", "[bold green]INSTALLED[/bold green] (.bob/settings.json)")
+        else:
+            table.add_row("IBM Bob Hooks", "[dim]Managed automatically per session[/dim]")
+
+        quarantine = repo_path / ".nagare" / "quarantine"
+        q_files = [f for f in quarantine.rglob("*") if f.is_file()] if quarantine.exists() else []
+        table.add_row("Quarantine Ledger", f"[yellow]{len(q_files)} rogue files isolated[/yellow] (.nagare/quarantine/)")
+
+        console.print()
+        console.print(table)
+        console.print()
     elif args.command == "install-hooks":
         from nagare.hooks import install_hooks
         print(f"[Nagare] Hooks installed in {install_hooks(repo_path)}")
