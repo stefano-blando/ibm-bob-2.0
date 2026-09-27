@@ -205,8 +205,11 @@ def create_app(repo_root: Path = Path(".")) -> FastAPI:
         }
 
     @app.post("/api/demo/scripted")
-    async def run_scripted_demo(delay: float = 1.1):
-        """Run the deterministic rogue-agent scenario on a throwaway copy and stream its real events."""
+    async def run_scripted_demo(delay: float = 1.1, delays: str = ""):
+        """Run the deterministic rogue-agent scenario on a throwaway copy and stream its real events.
+
+        `delays` (comma-separated seconds, one per step) paces the steps, e.g. to match a voice-over.
+        """
         from nagare.demo import run_demo
 
         if not demo_lock.acquire(blocking=False):
@@ -214,10 +217,16 @@ def create_app(repo_root: Path = Path(".")) -> FastAPI:
         if live_contract() is not None:
             demo_lock.release()
             return JSONResponse({"error": "a governed session is live in this repo"}, status_code=409)
+        clamp = lambda d: max(0.2, min(float(d), 8.0))
+        try:
+            pacing = [clamp(d) for d in delays.split(",") if d.strip()] if delays else clamp(delay)
+        except ValueError:
+            demo_lock.release()
+            return JSONResponse({"error": "delays must be comma-separated numbers"}, status_code=400)
         try:
             state["demo_running"] = True
             result = await asyncio.to_thread(
-                run_demo, max(0.2, min(delay, 3.0)), True, lambda copy: state.update(watched=copy),
+                run_demo, pacing, True, lambda copy: state.update(watched=copy),
             )
             await asyncio.sleep(0.8)  # let the tail loop flush the last events and the session end
             return {"passed": result.passed, "checks": [{"label": l, "ok": ok} for l, ok in result.checks]}

@@ -181,6 +181,30 @@
   @keyframes flashmoss { 0% { background: var(--moss-soft); border-color: var(--moss); } }
   .tile.enter { animation: enter .4s ease-out; }
   @keyframes enter { from { opacity: 0; transform: translateY(6px); } }
+  /* scope graph: how the lane was derived */
+  .graph-card { background: var(--card); border: 1.5px solid var(--rule-2); border-radius: 8px; padding: 12px 14px 8px; }
+  .graph-card svg { display: block; width: 100%; height: 150px; overflow: visible; }
+  .g-node rect { stroke-width: 1.5; rx: 6; }
+  .g-node text { font-family: var(--mono); font-size: 13px; }
+  .g-node .role { font-size: 10.5px; letter-spacing: .8px; text-transform: uppercase; }
+  .g-node.lane rect { fill: var(--moss-soft); stroke: var(--moss); }
+  .g-node.target rect { fill: var(--moss); stroke: var(--ink); }
+  .g-node.target text { fill: #fff; }
+  .g-node.prot rect { fill: var(--shu-soft); stroke: var(--shu); }
+  .g-node.dim rect { fill: var(--paper); stroke: var(--rule-2); }
+  .g-node.dim text { fill: var(--muted); }
+  .g-node { opacity: 0; animation: gnode .45s ease-out forwards; }
+  @keyframes gnode { from { opacity: 0; } to { opacity: 1; } }
+  .g-edge { fill: none; stroke-width: 2; stroke-linecap: round; }
+  .g-edge.lane { stroke: var(--moss); }
+  .g-edge.prot { stroke: var(--shu); stroke-dasharray: 5 5; }
+  .g-edge.draw { stroke-dasharray: 600; stroke-dashoffset: 600; animation: gdraw .7s ease-out forwards; }
+  .g-edge.prot.draw { animation: gdraw .7s ease-out forwards, gdash .01s linear .7s forwards; }
+  @keyframes gdraw { to { stroke-dashoffset: 0; } }
+  @keyframes gdash { to { stroke-dasharray: 5 5; } }
+  .g-legend { display: flex; gap: 18px; font-size: 12.5px; color: var(--ink-2); margin-top: 4px; flex-wrap: wrap; }
+  .g-legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--moss); vertical-align: 4px; margin-right: 6px; }
+  .g-legend i.p { border-top: 2px dashed var(--shu); }
   .empty-note { font-size: 13px; color: var(--muted); font-style: italic; padding: 4px 0; }
   .hidden { display: none !important; }
 
@@ -346,6 +370,16 @@
     </div>
 
     <div class="repo">
+      <div class="group hidden" id="grp-graph">
+        <div class="group-head">
+          <div class="group-title">How the lane is drawn</div>
+          <div class="group-sub">task target from the prompt · 1-hop import graph · protection rules</div>
+        </div>
+        <div class="graph-card">
+          <svg id="graph" aria-label="Import graph of the task scope"></svg>
+          <div class="g-legend"><span><i></i>import → in lane</span><span><i class="p"></i>import, but protected by rule</span><span>red without edges: protected by pattern (schema, secrets)</span></div>
+        </div>
+      </div>
       <div class="group lane">
         <div class="group-head">
           <div class="group-title"><span class="sw" style="background:var(--moss)"></span>Lane</div>
@@ -512,7 +546,89 @@
     if (!prompt || S.active) return;
     S.ended = false; setStatus();
     const res = await fetch(`/api/contract?prompt=${encodeURIComponent(prompt)}`);
-    if (res.ok) { const c = await res.json(); renderContract(c, c.live); }
+    if (res.ok) { const c = await res.json(); renderContract(c, c.live); await renderGraph(prompt, c); }
+  }
+
+  // ------------------------------------------------------------------ scope graph
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs, parent) {
+    const el = document.createElementNS(SVGNS, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    if (parent) parent.appendChild(el);
+    return el;
+  }
+
+  async function renderGraph(prompt, c) {
+    const res = await fetch(`/api/graph?prompt=${encodeURIComponent(prompt)}`);
+    if (!res.ok) return;
+    const g = await res.json();
+    const byId = new Map(g.nodes.map(n => [n.id, n]));
+    const perm = new Set(c.permitted), prot = new Set(c.restricted);
+    const low = prompt.toLowerCase();
+    // Targets: permitted files the prompt names (full path or file name).
+    let targets = c.permitted.filter(p => low.includes(p.toLowerCase()) || low.includes(p.split('/').pop().toLowerCase()));
+    // No file named in the prompt: there is no single target to draw the derivation from.
+    if (!targets.length) { $('grp-graph').classList.add('hidden'); return; }
+    const tset = new Set(targets);
+    const importers = new Set(), imports = new Set();
+    for (const t of targets) {
+      const n = byId.get(t); if (!n) continue;
+      n.imported_by.forEach(x => { if (!tset.has(x)) importers.add(x); });
+      n.imports.forEach(x => { if (!tset.has(x)) imports.add(x); });
+    }
+    const roots = new Set(c.permitted.map(p => p.split('/')[0]));
+    const shown = new Set([...targets, ...importers, ...imports]);
+    const rest = [
+      ...c.restricted.filter(p => !shown.has(p)),
+      ...g.nodes.map(n => n.id).filter(id => roots.has(id.split('/')[0]) && !shown.has(id) && !prot.has(id)),
+    ];
+    const cols = [[...importers], targets, [...imports], rest].filter(col => col.length);
+
+    $('grp-graph').classList.remove('hidden');   // visible before measuring its width
+    const svg = $('graph');
+    svg.innerHTML = '';
+    const W = svg.getBoundingClientRect().width || 900, H = 150, bw = Math.min(220, W / cols.length - 50), bh = 44;
+    const pos = new Map();
+    cols.forEach((col, ci) => {
+      const x = cols.length === 1 ? W / 2 : 10 + bw / 2 + ci * (W - 20 - bw) / (cols.length - 1);
+      const gap = Math.min(58, (H - 10) / col.length);
+      col.forEach((id, ri) => pos.set(id, { x, y: H / 2 + (ri - (col.length - 1) / 2) * gap, col: ci }));
+    });
+    const kind = id => tset.has(id) ? 'target' : prot.has(id) ? 'prot' : perm.has(id) ? 'lane' : 'dim';
+    const role = id => tset.has(id) ? 'task target' : importers.has(id) ? (prot.has(id) ? 'imports target · protected' : 'imports target') :
+                       imports.has(id) ? (prot.has(id) ? 'imported · protected' : 'imported by target') : prot.has(id) ? 'protected by pattern' : 'out of scope';
+    const edges = [];
+    for (const t of targets) {
+      const n = byId.get(t); if (!n) continue;
+      n.imported_by.filter(x => pos.has(x)).forEach(x => edges.push([x, t]));
+      n.imports.filter(x => pos.has(x)).forEach(x => edges.push([t, x]));
+    }
+    const defs = svgEl('defs', {}, svg);
+    [['lane', 'var(--moss)'], ['prot', 'var(--shu)']].forEach(([k, col]) => {
+      const m = svgEl('marker', { id: `arr-${k}`, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, defs);
+      svgEl('path', { d: 'M0,0 L10,5 L0,10 z', fill: col }, m);
+    });
+    edges.forEach(([a, b], i) => {
+      const A = pos.get(a), B = pos.get(b);
+      const x1 = A.x + bw / 2, x2 = B.x - bw / 2 - 3, mx = (x1 + x2) / 2;
+      const k = prot.has(a) || prot.has(b) ? 'prot' : 'lane';
+      const e = svgEl('path', { d: `M${x1},${A.y} C${mx},${A.y} ${mx},${B.y} ${x2},${B.y}`, class: `g-edge ${k} draw`, 'marker-end': `url(#arr-${k})` }, svg);
+      e.style.animationDelay = `${0.35 + 0.35 * Math.max(A.col, B.col) + i * 0.05}s`;
+    });
+    for (const [id, p] of pos) {
+      const grp = svgEl('g', { class: `g-node ${kind(id)}`, transform: `translate(${p.x - bw / 2},${p.y - bh / 2})` }, svg);
+      grp.style.animationDelay = `${0.3 * p.col}s`;
+      svgEl('rect', { width: bw, height: bh }, grp);
+      const name = svgEl('text', { x: 10, y: 19 }, grp);
+      const file = id.split('/').pop(), dir = id.slice(0, id.length - file.length);
+      name.innerHTML = `<tspan font-weight="600" font-size="14">${esc(file)}</tspan>`;
+      svgEl('title', {}, grp).textContent = id;
+      const r = svgEl('text', { x: 10, y: 35, class: 'role' }, grp);
+      r.textContent = role(id);
+      if (kind(id) === 'lane') r.setAttribute('fill', 'var(--moss)');
+      if (kind(id) === 'prot') r.setAttribute('fill', 'var(--shu)');
+    }
+    $('grp-graph').classList.remove('hidden');
   }
 
   // ------------------------------------------------------------------ fx
@@ -668,6 +784,7 @@
       S.active = true; S.ended = false;
       S.preexisting = new Set(msg.preexisting || []);
       renderContract(msg.contract, true);
+      $('grp-graph').classList.add('hidden');   // the live session needs the room for events
       showTask(msg.contract.task);
       for (const p of S.preexisting) {
         if (!groupFor(p)) tile(p, 'wip', tag('safe', 'untouched'));
@@ -693,12 +810,13 @@
   }
 
   // ------------------------------------------------------------------ scripted demo
-  async function runDemo() {
+  async function runDemo(delays) {
     if (S.active) return;
     setView('live');
     $('btn-demo').disabled = true;
     try {
-      const res = await fetch('/api/demo/scripted', { method: 'POST' });
+      const q = delays ? `?delays=${encodeURIComponent(delays)}` : '';
+      const res = await fetch(`/api/demo/scripted${q}`, { method: 'POST' });
       const data = await res.json();
       await fxQueue;
       if (data.checks) {

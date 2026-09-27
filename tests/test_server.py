@@ -65,3 +65,10 @@ def test_scripted_demo_endpoint_runs_real_scenario(tmp_path):
     assert data["passed"], data["checks"]
     labels = [c["label"] for c in data["checks"]]
     assert "hook denied write_file on schema.sql" in labels
+
+
+def test_scripted_demo_accepts_per_step_pacing(tmp_path):
+    client = TestClient(create_app(repo_root=tmp_path))
+    assert client.post("/api/demo/scripted?delays=0.2,oops").status_code == 400
+    res = client.post("/api/demo/scripted?delays=" + ",".join(["0.2"] * 8))
+    assert res.status_code == 200 and res.json()["passed"]
