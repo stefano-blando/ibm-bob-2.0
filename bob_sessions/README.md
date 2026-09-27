@@ -14,4 +14,4 @@ This folder contains exported task session reports and consumption summaries fro
 ## Contents of this folder
 - `live_ab_20260927/` — live IBM Bob A/B runs (same prompt, governed vs ungoverned) with diffs, transcripts and Bob's cost lines. **Start here.**
 - `nagare_session_*.md` — Nagare session reports. Files dated 2026-09-26 and the early hours of 2026-09-27 were produced by v0.1/v0.2, which rolled back to HEAD and could revert the developer's own files (e.g. `backend/nagare/runner.py`, `.bob`); they are kept for the record. The 221800 run used a prompt that *asked* for the schema edit, and its 116 schema interceptions include a ~6/s write/rollback loop.
-- Still to add before submission: Bob's own exported task history (`.md`) and Bobcoin consumption screenshots.
+- `bobalytics/` — Bob usage export from the Bob profile (Bobalytics, 2026-08-29 → 2026-09-27): 2 active days, 33 tasks completed (5 on 26 Sep, 28 on 27 Sep), $28.77 total spend (`user_Activity_pattern.csv`, `user_Days_active.csv`). This covers the development sessions and the live evaluation runs in `live_ab_20260927/` and `../experiments/results/live_bob_20260927/`.
