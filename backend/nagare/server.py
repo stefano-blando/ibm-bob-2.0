@@ -4,8 +4,13 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
+import shutil
+import subprocess
+import tempfile
 from nagare.scope import ScopeSynthesizer
 from nagare.models import TelemetrySnapshot, ScopeContract
+from nagare.hooks import read_events
+from nagare.paths import CONTRACT_FILE
 
 HTML_DASHBOARD = """<!DOCTYPE html>
 <html lang="en" class="dark">
@@ -44,7 +49,7 @@ HTML_DASHBOARD = """<!DOCTYPE html>
       <span class="text-2xl">🌊</span>
       <div>
         <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-          Nagare Governor <span class="text-xs bg-ibmBlue/30 text-ibmBlue font-mono px-2 py-0.5 rounded">v0.1.0 (IBM Bob 2.0)</span>
+          Nagare Governor <span class="text-xs bg-ibmBlue/30 text-ibmBlue font-mono px-2 py-0.5 rounded">v0.3.0 (IBM Bob 2.0)</span>
         </h1>
         <p class="text-xs text-gray-400">Autonomous Coding Agent Flight Recorder & Active In-Flight Lane Assist</p>
       </div>
@@ -52,12 +57,12 @@ HTML_DASHBOARD = """<!DOCTYPE html>
     <div class="flex items-center space-x-6 text-sm">
       <div class="flex items-center gap-2">
         <span class="w-3 h-3 rounded-full bg-emerald-500 pulse-shield"></span>
-        <span class="text-emerald-400 font-semibold" id="sys-status">GOVERNOR ACTIVE</span>
+        <span class="text-emerald-400 font-semibold" id="sys-status">IDLE</span>
       </div>
       <div class="bg-gray-900 border border-gray-800 px-3 py-1.5 rounded-lg flex items-center gap-4">
-        <div><span class="text-gray-400 text-xs">Blocked:</span> <span class="font-bold text-shieldRed text-base" id="stat-interceptions">0</span></div>
-        <div><span class="text-gray-400 text-xs">Rollback:</span> <span class="font-bold text-nagareTeal text-base" id="stat-latency">&lt; 15 ms</span></div>
-        <div><span class="text-gray-400 text-xs">Bobcoins Saved:</span> <span class="font-bold text-yellow-400 text-base" id="stat-coins">0.00</span></div>
+        <div><span class="text-gray-400 text-xs">Prevented:</span> <span class="font-bold text-shieldRed text-base" id="stat-denied">0</span></div>
+        <div><span class="text-gray-400 text-xs">Repaired:</span> <span class="font-bold text-nagareTeal text-base" id="stat-repaired">0</span></div>
+        <div><span class="text-gray-400 text-xs">Last restore:</span> <span class="font-bold text-yellow-400 text-base" id="stat-latency">–</span></div>
       </div>
     </div>
   </header>
@@ -128,7 +133,7 @@ HTML_DASHBOARD = """<!DOCTYPE html>
           <span class="w-2 h-2 rounded-full bg-ibmBlue pulse-shield"></span>
         </h2>
         <div id="log-terminal" class="bg-black/80 font-mono text-xs p-3 rounded-lg border border-gray-800 h-28 overflow-y-auto space-y-1 text-gray-300">
-          <div class="text-gray-500">[SYS] Nagare Flight Recorder connected to kernel inotify events.</div>
+          <div class="text-gray-500">[SYS] Flight Recorder attached. Live events appear here while `nagare run` governs Bob.</div>
         </div>
       </div>
     </div>
@@ -196,33 +201,43 @@ HTML_DASHBOARD = """<!DOCTYPE html>
       addLog(`Graph loaded: ${data.nodes.length} nodes, ${data.edges.length} edges.`);
     }
 
+    let denied = 0, repaired = 0;
+    function markNode(file, color) {
+      if (!network) return;
+      try { network.body.data.nodes.update({ id: file, color: color }); } catch (e) {}
+    }
+    function handleEvent(msg) {
+      if (msg.type === 'session') {
+        document.getElementById('sys-status').textContent = msg.active ? 'GOVERNING BOB' : 'IDLE';
+        if (msg.active && msg.task) { document.getElementById('prompt-input').value = msg.task; loadGraph(); }
+        return;
+      }
+      if (msg.type !== 'intervention') return;
+      const layer = msg.layer === 'hook' ? 'PREVENTED (hook, before write)' : 'REPAIRED (inotify, after write)';
+      if (msg.action === 'DENIED') denied += msg.repeat_count || 1;
+      else if (msg.action === 'ROLLED_BACK' || msg.action === 'QUARANTINED') repaired += msg.repeat_count || 1;
+      document.getElementById('stat-denied').textContent = denied;
+      document.getElementById('stat-repaired').textContent = repaired;
+      if (msg.latency_ms !== undefined) document.getElementById('stat-latency').textContent = msg.latency_ms + ' ms';
+      const kind = msg.action === 'WARNED' ? 'info' : 'intercept';
+      addLog(`${msg.action} ${msg.file_path} — ${layer}${msg.repeat_count > 1 ? ' ×' + msg.repeat_count : ''}`, kind);
+      markNode(msg.file_path, '#fa4d56');
+    }
     function setupWebSocket() {
       const loc = window.location;
       const wsUrl = (loc.protocol === 'https:' ? 'wss://' : 'ws://') + loc.host + '/ws';
       ws = new WebSocket(wsUrl);
-
-      ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'interception') {
-          interceptionCount++;
-          document.getElementById('stat-interceptions').textContent = interceptionCount;
-          document.getElementById('stat-coins').textContent = (interceptionCount * 0.45).toFixed(2);
-          addLog(`Interception on '${msg.file}': Sub-15ms Micro-Rollback applied!`, 'intercept');
-        } else if (msg.type === 'mutation') {
-          addLog(`Permitted write on '${msg.file}' verified.`, 'permitted');
-        }
-      };
+      ws.onmessage = (event) => handleEvent(JSON.parse(event.data));
+      ws.onclose = () => setTimeout(setupWebSocket, 1000);
     }
 
     document.getElementById('btn-recompute').addEventListener('click', loadGraph);
     document.getElementById('btn-simulate').addEventListener('click', async () => {
-      addLog('Simulating agent out-of-scope write to database/schema.sql...');
+      addLog('Running a real write + restore in a throwaway git repo...');
       const res = await fetch('/api/simulate_interception', { method: 'POST' });
       const data = await res.json();
-      interceptionCount++;
-      document.getElementById('stat-interceptions').textContent = interceptionCount;
-      document.getElementById('stat-coins').textContent = (interceptionCount * 0.45).toFixed(2);
-      addLog(`Shield Triggered: ${data.detail} (Restored in ${data.latency_ms}ms)`, 'intercept');
+      handleEvent({ type: 'intervention', action: 'ROLLED_BACK', layer: 'fs', file_path: data.file, latency_ms: data.latency_ms });
+      addLog(`Measured: corrupted bytes on disk for ${data.latency_ms} ms (write → inotify → restore), restored=${data.restored}`);
     });
 
     window.addEventListener('load', () => {
@@ -257,7 +272,28 @@ def create_app(repo_root: Path = Path(".")) -> FastAPI:
     repo = Path(repo_root).resolve()
     app = FastAPI(title="Nagare Governor Flight Recorder")
     manager = ConnectionManager()
-    latest_snapshot = TelemetrySnapshot(task_intent="Default Session", status="ACTIVE")
+
+    def live_contract() -> Optional[ScopeContract]:
+        return ScopeContract.load(repo / CONTRACT_FILE)
+
+    @app.on_event("startup")
+    async def tail_session_events():
+        async def tail():
+            offset, was_active = 0, None
+            while True:
+                active = (repo / CONTRACT_FILE).exists()
+                if active != was_active:
+                    contract = live_contract()
+                    await manager.broadcast({"type": "session", "active": active,
+                                             "task": contract.task_intent if contract else ""})
+                    if active:
+                        offset = 0
+                    was_active = active
+                events, offset = read_events(repo, offset)
+                for event in events:
+                    await manager.broadcast({"type": "intervention", **event.to_dict()})
+                await asyncio.sleep(0.2)
+        asyncio.create_task(tail())
 
     @app.get("/", response_class=HTMLResponse)
     async def index():
@@ -266,13 +302,17 @@ def create_app(repo_root: Path = Path(".")) -> FastAPI:
     @app.get("/api/graph")
     async def get_graph(prompt: str = "Refactor authentication"):
         synthesizer = ScopeSynthesizer(repo)
-        contract = synthesizer.synthesize_scope(prompt)
+        contract = live_contract()
+        if contract is None:
+            contract = synthesizer.synthesize_scope(prompt)
+        else:
+            synthesizer.build_dependency_graph()
 
         nodes = []
         for node in synthesizer.graph.nodes:
-            rel_str = str(node)
+            rel_str = node.as_posix()
             is_perm = contract.is_permitted(node)
-            is_restr = contract.is_restricted(node)
+            is_restr = contract.is_sensitive(node)
 
             if is_perm:
                 color = "#00d2b4"
@@ -293,54 +333,70 @@ def create_app(repo_root: Path = Path(".")) -> FastAPI:
             })
 
         edges = [
-            {"from": str(u), "to": str(v)}
+            {"from": u.as_posix(), "to": v.as_posix()}
             for u, v in synthesizer.graph.edges
         ]
 
         return {
             "nodes": nodes,
             "edges": edges,
-            "permitted": [str(p) for p in sorted(contract.permitted_paths)],
-            "restricted": [str(p) for p in sorted(contract.restricted_paths)],
+            "live_session": live_contract() is not None,
+            "permitted": [p.as_posix() for p in sorted(contract.permitted_paths)],
+            "restricted": [p.as_posix() for p in sorted(contract.restricted_paths)],
             "permitted_count": len(contract.permitted_paths),
             "restricted_count": len(contract.restricted_paths),
         }
 
     @app.get("/api/telemetry")
     async def get_telemetry():
+        events, _ = read_events(repo, 0)
+        snapshot = TelemetrySnapshot(task_intent="", status="ACTIVE" if live_contract() else "IDLE")
+        for event in events:
+            snapshot.record_violation(event)
+        contract = live_contract()
         return {
-            "status": latest_snapshot.status,
-            "task_intent": latest_snapshot.task_intent,
-            "elapsed_seconds": latest_snapshot.elapsed_seconds,
-            "total_rollbacks": latest_snapshot.total_rollbacks,
-            "violations": [v.to_dict() for v in latest_snapshot.violations],
+            "status": snapshot.status,
+            "task_intent": contract.task_intent if contract else "",
+            "total_denied": snapshot.total_denied,
+            "total_rollbacks": snapshot.total_rollbacks,
+            "total_quarantined": snapshot.total_quarantined,
+            "violations": [v.to_dict() for v in snapshot.violations],
         }
 
     @app.post("/api/simulate_interception")
     async def simulate_interception():
-        import time
-        t0 = time.perf_counter()
-        # Simulate quick rollback
-        time.sleep(0.004) # 4ms
-        t1 = time.perf_counter()
-        latency_ms = round((t1 - t0) * 1000.0, 2)
-
-        event_data = {
-            "type": "interception",
-            "file": "database/schema.sql",
-            "action": "ROLLED_BACK",
-            "latency_ms": latency_ms,
-            "timestamp": time.time(),
-        }
-        await manager.broadcast(event_data)
+        # A real measurement, not an animation: corrupt a protected file in a throwaway repo
+        # and time how long the corrupted bytes survive on disk.
+        from nagare.benchmark import run_end_to_end_benchmark
+        tmp = Path(tempfile.mkdtemp(prefix="nagare_sim_"))
+        try:
+            (tmp / "database").mkdir()
+            (tmp / "database" / "schema.sql").write_text("CREATE TABLE users (id INT);\n")
+            for args in (["init", "-q"], ["add", "."],
+                         ["-c", "user.email=sim@nagare", "-c", "user.name=sim", "commit", "-qm", "init"]):
+                subprocess.run(["git", *args], cwd=tmp, check=True, capture_output=True)
+            result = await asyncio.to_thread(
+                run_end_to_end_benchmark, tmp, Path("database/schema.sql"), 1, "simulation"
+            )
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
         return {
-            "detail": "Interception simulated on database/schema.sql",
-            "latency_ms": latency_ms
+            "file": "database/schema.sql",
+            "latency_ms": round(result.median_latency_ms, 2),
+            "restored": result.corruptions_blocked == 1,
         }
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
         await manager.connect(websocket)
+        # Late joiners get the current session state and every event so far.
+        contract = live_contract()
+        await websocket.send_text(json.dumps({"type": "session", "active": contract is not None,
+                                              "task": contract.task_intent if contract else ""}))
+        if contract is not None:
+            events, _ = read_events(repo, 0)
+            for event in events:
+                await websocket.send_text(json.dumps({"type": "intervention", **event.to_dict()}))
         try:
             while True:
                 await websocket.receive_text()

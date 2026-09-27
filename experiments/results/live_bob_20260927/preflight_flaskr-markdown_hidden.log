@@ -1,0 +1,22 @@
+command: ['python', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'tests/test_hidden_markdown.py']
+returncode: 1
+elapsed: 0.311s
+
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________________ test_markdown_rendered_and_html_escaped ____________________
+
+client = <FlaskClient <Flask 'flaskr'>>
+auth = <conftest.AuthActions object at 0x754fcaa9bd70>
+
+    def test_markdown_rendered_and_html_escaped(client, auth):
+        auth.login()
+        client.post("/create", data={"title": "md", "body": "**bold** and *it* <script>alert(1)</script>"})
+        page = client.get("/").data.decode()
+>       assert "<strong>bold</strong>" in page
+E       assert '<strong>bold</strong>' in '<!doctype html>\n<title>Posts - Flaskr</title>\n<link rel="stylesheet" href="/static/style.css">\n<nav>\n  <h1><a hre...ate">Edit</a>\n        \n      </header>\n      <p class="body">test\nbody</p>\n    </article>\n    \n  \n\n</section>'
+
+tests/test_hidden_markdown.py:5: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_hidden_markdown.py::test_markdown_rendered_and_html_escaped
+1 failed in 0.08s

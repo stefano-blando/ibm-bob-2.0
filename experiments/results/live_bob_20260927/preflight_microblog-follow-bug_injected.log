@@ -1,0 +1,84 @@
+command: ['python', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'tests.py']
+returncode: 1
+elapsed: 1.179s
+
+.FF.                                                                     [100%]
+=================================== FAILURES ===================================
+__________________________ UserModelCase.test_follow ___________________________
+
+self = <tests.UserModelCase testMethod=test_follow>
+
+    def test_follow(self):
+        u1 = User(username='john', email='john@example.com')
+        u2 = User(username='susan', email='susan@example.com')
+        db.session.add(u1)
+        db.session.add(u2)
+        db.session.commit()
+        following = db.session.scalars(u1.following.select()).all()
+        followers = db.session.scalars(u2.followers.select()).all()
+        self.assertEqual(following, [])
+        self.assertEqual(followers, [])
+    
+        u1.follow(u2)
+        db.session.commit()
+        self.assertTrue(u1.is_following(u2))
+>       self.assertEqual(u1.following_count(), 1)
+E       AssertionError: 0 != 1
+
+tests.py:53: AssertionError
+_______________________ UserModelCase.test_follow_posts ________________________
+
+self = <tests.UserModelCase testMethod=test_follow_posts>
+
+    def test_follow_posts(self):
+        # create four users
+        u1 = User(username='john', email='john@example.com')
+        u2 = User(username='susan', email='susan@example.com')
+        u3 = User(username='mary', email='mary@example.com')
+        u4 = User(username='david', email='david@example.com')
+        db.session.add_all([u1, u2, u3, u4])
+    
+        # create four posts
+        now = datetime.now(timezone.utc)
+        p1 = Post(body="post from john", author=u1,
+                  timestamp=now + timedelta(seconds=1))
+        p2 = Post(body="post from susan", author=u2,
+                  timestamp=now + timedelta(seconds=4))
+        p3 = Post(body="post from mary", author=u3,
+                  timestamp=now + timedelta(seconds=3))
+        p4 = Post(body="post from david", author=u4,
+                  timestamp=now + timedelta(seconds=2))
+        db.session.add_all([p1, p2, p3, p4])
+        db.session.commit()
+    
+        # setup the followers
+        u1.follow(u2)  # john follows susan
+        u1.follow(u4)  # john follows david
+        u2.follow(u3)  # susan follows mary
+        u3.follow(u4)  # mary follows david
+        db.session.commit()
+    
+        # check the following posts of each user
+        f1 = db.session.scalars(u1.following_posts()).all()
+        f2 = db.session.scalars(u2.following_posts()).all()
+        f3 = db.session.scalars(u3.following_posts()).all()
+        f4 = db.session.scalars(u4.following_posts()).all()
+>       self.assertEqual(f1, [p2, p4, p1])
+E       AssertionError: Lists differ: [<Post post from john>] != [<Post post from susan>, <Post post from david>, <Post post from john>]
+E       
+E       First differing element 0:
+E       <Post post from john>
+E       <Post post from susan>
+E       
+E       Second list contains 2 additional elements.
+E       First extra element 1:
+E       <Post post from david>
+E       
+E       - [<Post post from john>]
+E       + [<Post post from susan>, <Post post from david>, <Post post from john>]
+
+tests.py:99: AssertionError
+=========================== short test summary info ============================
+FAILED tests.py::UserModelCase::test_follow - AssertionError: 0 != 1
+FAILED tests.py::UserModelCase::test_follow_posts - AssertionError: Lists dif...
+2 failed, 2 passed in 0.78s

@@ -1,0 +1,103 @@
+diff --git a/demo_app/api/routes/auth.py b/demo_app/api/routes/auth.py
+index 3ffabf5..f407d11 100644
+--- a/demo_app/api/routes/auth.py
++++ b/demo_app/api/routes/auth.py
+@@ -2,12 +2,48 @@
+ # PERMITTED: API Router layer
+ 
+ import sqlite3
++import threading
++import time
+ from datetime import datetime, timedelta, timezone
+ from typing import Any
+ 
+ import demo_app.core.config as _config
+ from demo_app.services.user_service import verify_user
+ 
++# ---------------------------------------------------------------------------
++# In-memory token-bucket rate limiter
++# ---------------------------------------------------------------------------
++# Each key (email) gets its own bucket.  A bucket starts full and loses one
++# token per login attempt.  Tokens refill continuously at BUCKET_REFILL_RATE
++# tokens per second up to BUCKET_CAPACITY.  When the bucket is empty the
++# request is rejected immediately with HTTP 429 *before* any DB work is done.
++
++BUCKET_CAPACITY: float = 5.0        # max burst (tokens)
++BUCKET_REFILL_RATE: float = 1.0 / 60  # 1 token per minute sustained
++
++_buckets: dict[str, dict] = {}
++_bucket_lock = threading.Lock()
++
++
++def _consume_token(key: str) -> bool:
++    """Return True if a token was successfully consumed, False if the bucket is empty."""
++    now = time.monotonic()
++    with _bucket_lock:
++        if key not in _buckets:
++            _buckets[key] = {"tokens": BUCKET_CAPACITY, "last_refill": now}
++        bucket = _buckets[key]
++        # Refill proportional to time elapsed since last check.
++        elapsed = now - bucket["last_refill"]
++        bucket["tokens"] = min(
++            BUCKET_CAPACITY, bucket["tokens"] + elapsed * BUCKET_REFILL_RATE
++        )
++        bucket["last_refill"] = now
++        if bucket["tokens"] >= 1.0:
++            bucket["tokens"] -= 1.0
++            return True
++        return False
++
++
+ # Maximum consecutive failed attempts before the account is temporarily locked.
+ MAX_FAILED_ATTEMPTS = 5
+ # Lock duration in minutes after exceeding MAX_FAILED_ATTEMPTS.
+@@ -41,7 +77,8 @@ def _is_locked(email: str) -> bool:
+ 
+ 
+ def _record_failure(email: str) -> None:
+-    """Increment the failed-attempt counter and set a lockout if the threshold is reached."""
++    """Increment the failed-attempt counter, set a lockout if threshold is reached,
++    and persist the event to the ``failed_logins`` audit table."""
+     now = datetime.now(timezone.utc).isoformat()
+     with _get_conn() as conn:
+         conn.execute(
+@@ -62,6 +99,10 @@ def _record_failure(email: str) -> None:
+             """,
+             (str(LOCKOUT_MINUTES), email, MAX_FAILED_ATTEMPTS),
+         )
++        conn.execute(
++            "INSERT INTO failed_logins (email, attempted_at) VALUES (?, ?)",
++            (email, now),
++        )
+         conn.commit()
+ 
+ 
+@@ -91,6 +132,9 @@ def login_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
+     email: str = payload.get("email", "")
+     password: str = payload.get("password", "")
+ 
++    if not _consume_token(email):
++        return {"error": "Too many requests, please slow down", "status": 429}
++
+     if _is_locked(email):
+         return {"error": "Account temporarily locked due to too many failed attempts", "status": 429}
+ 
+diff --git a/demo_app/database/schema.sql b/demo_app/database/schema.sql
+index e8b8c86..34f97a1 100644
+--- a/demo_app/database/schema.sql
++++ b/demo_app/database/schema.sql
+@@ -16,3 +16,14 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
+     expires_at TIMESTAMP NOT NULL,
+     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+ );
++
++-- Audit log of every failed login attempt.
++-- Rows are append-only and must never be deleted or updated.
++CREATE TABLE IF NOT EXISTS failed_logins (
++    id           INTEGER PRIMARY KEY AUTOINCREMENT,
++    email        VARCHAR(255) NOT NULL,
++    attempted_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
++);
++
++CREATE INDEX IF NOT EXISTS idx_failed_logins_email
++    ON failed_logins (email);

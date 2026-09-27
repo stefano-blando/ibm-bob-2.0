@@ -1,0 +1,89 @@
+[fastapi-realworld-example-app] 19 commits sampled (HEAD 029eb778)
+[full-stack-fastapi-template] 76 commits sampled (HEAD cb740b65)
+  25/76
+  50/76
+  75/76
+[flask] 150 commits sampled (HEAD d73fa1cd)
+  25/150
+  50/150
+  75/150
+  100/150
+  125/150
+  150/150
+[healthchecks] 150 commits sampled (HEAD 3731fc45)
+  25/150
+  50/150
+  75/150
+  100/150
+  125/150
+  150/150
+[react-redux-realworld-example-app] 10 commits sampled (HEAD ee72eba4)
+[microblog] 16 commits sampled (HEAD a975ef64)
+
+repo                             variant                           pass%  recall%  open%  sens%
+fastapi-realworld-example-app    lane | mention+out1                31.6     66.7   65.3   52.6
+fastapi-realworld-example-app    lane | mention+both1               36.8     68.8   67.7   52.6
+fastapi-realworld-example-app    lane | bm25+none                   26.3     47.9   24.5   52.6
+fastapi-realworld-example-app    lane | bm25+out1                   26.3     52.1   30.7   52.6
+fastapi-realworld-example-app    lane | bm25+both1                  26.3     60.4   34.9   52.6
+fastapi-realworld-example-app    lane | bm25+both2                  36.8     70.8   54.2   52.6
+fastapi-realworld-example-app    lane | bm25+cochange               26.3     54.2   28.1   52.6
+fastapi-realworld-example-app    lane | bm25+both1+cochange         26.3     64.6   37.9   52.6
+fastapi-realworld-example-app    guard | bm25+both1+cochange        47.4     85.4   37.9   52.6
+fastapi-realworld-example-app    strict | bm25+both1+cochange       26.3     64.6   37.9   52.6
+fastapi-realworld-example-app    sensitive-only (reference)         47.4     85.4   97.3   52.6
+full-stack-fastapi-template      lane | mention+out1                44.7     65.6   57.4   30.3
+full-stack-fastapi-template      lane | mention+both1               46.1     72.5   63.3   30.3
+full-stack-fastapi-template      lane | bm25+none                   44.7     55.6   37.5   30.3
+full-stack-fastapi-template      lane | bm25+out1                   48.7     61.2   44.2   30.3
+full-stack-fastapi-template      lane | bm25+both1                  55.3     71.2   54.3   30.3
+full-stack-fastapi-template      lane | bm25+both2                  67.1     83.8   72.2   30.3
+full-stack-fastapi-template      lane | bm25+cochange               48.7     60.6   41.4   30.3
+full-stack-fastapi-template      lane | bm25+both1+cochange         55.3     72.5   56.0   30.3
+full-stack-fastapi-template      guard | bm25+both1+cochange        69.7     88.8   56.0   30.3
+full-stack-fastapi-template      strict | bm25+both1+cochange       42.1     72.5   56.0   30.3
+full-stack-fastapi-template      sensitive-only (reference)         69.7     88.8   97.7   30.3
+flask                            lane | mention+out1                66.0     63.5   56.4    1.3
+flask                            lane | mention+both1               70.0     70.3   59.1    1.3
+flask                            lane | bm25+none                   46.0     52.6   21.6    1.3
+flask                            lane | bm25+out1                   50.0     57.8   26.5    1.3
+flask                            lane | bm25+both1                  61.3     67.9   30.2    1.3
+flask                            lane | bm25+both2                  83.3     86.3   69.0    1.3
+flask                            lane | bm25+cochange               58.7     66.3   27.6    1.3
+flask                            lane | bm25+both1+cochange         67.3     74.7   35.0    1.3
+flask                            guard | bm25+both1+cochange        98.7     99.2   35.0    1.3
+flask                            strict | bm25+both1+cochange       50.0     74.7   35.0    1.3
+flask                            sensitive-only (reference)         98.0     99.2  100.0    1.3
+healthchecks                     lane | mention+out1                38.7     51.7   14.8    6.0
+healthchecks                     lane | mention+both1               44.7     57.3   16.3    6.0
+healthchecks                     lane | bm25+none                   26.7     36.5    7.0    6.0
+healthchecks                     lane | bm25+out1                   31.3     45.1    8.2    6.0
+healthchecks                     lane | bm25+both1                  36.0     51.4    9.5    6.0
+healthchecks                     lane | bm25+both2                  70.0     82.3   38.5    6.0
+healthchecks                     lane | bm25+cochange               43.3     54.5    9.0    6.0
+healthchecks                     lane | bm25+both1+cochange         48.0     62.8   11.0    6.0
+healthchecks                     guard | bm25+both1+cochange        94.0    100.0   11.0    6.0
+healthchecks                     strict | bm25+both1+cochange       29.3     62.8   11.0    6.0
+healthchecks                     sensitive-only (reference)         92.7    100.0   68.1    6.0
+react-redux-realworld-example-app lane | mention+out1                60.0     43.5   37.3    0.0
+react-redux-realworld-example-app lane | mention+both1               60.0     56.5   43.1    0.0
+react-redux-realworld-example-app lane | bm25+none                   60.0     52.2   26.3    0.0
+react-redux-realworld-example-app lane | bm25+out1                   60.0     52.2   30.5    0.0
+react-redux-realworld-example-app lane | bm25+both1                  60.0     69.6   41.4    0.0
+react-redux-realworld-example-app lane | bm25+both2                  90.0     95.7   74.0    0.0
+react-redux-realworld-example-app lane | bm25+cochange               60.0     52.2   26.3    0.0
+react-redux-realworld-example-app lane | bm25+both1+cochange         60.0     69.6   41.4    0.0
+react-redux-realworld-example-app guard | bm25+both1+cochange       100.0    100.0   41.4    0.0
+react-redux-realworld-example-app strict | bm25+both1+cochange       60.0     69.6   41.4    0.0
+react-redux-realworld-example-app sensitive-only (reference)        100.0    100.0  100.0    0.0
+microblog                        lane | mention+out1                62.5    100.0   69.0   31.2
+microblog                        lane | mention+both1               62.5    100.0   69.0   31.2
+microblog                        lane | bm25+none                   56.2     97.4   66.9   31.2
+microblog                        lane | bm25+out1                   62.5    100.0   67.6   31.2
+microblog                        lane | bm25+both1                  62.5    100.0   68.3   31.2
+microblog                        lane | bm25+both2                  62.5    100.0   69.0   31.2
+microblog                        lane | bm25+cochange               62.5    100.0   68.3   31.2
+microblog                        lane | bm25+both1+cochange         62.5    100.0   69.0   31.2
+microblog                        guard | bm25+both1+cochange        68.8    100.0   69.0   31.2
+microblog                        strict | bm25+both1+cochange        0.0    100.0   69.0   31.2
+microblog                        sensitive-only (reference)         62.5    100.0   69.0   31.2

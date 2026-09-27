@@ -1,0 +1,131 @@
+diff --git a/demo_app/api/routes/auth.py b/demo_app/api/routes/auth.py
+index 3ffabf5..ce3e9ca 100644
+--- a/demo_app/api/routes/auth.py
++++ b/demo_app/api/routes/auth.py
+@@ -2,17 +2,60 @@
+ # PERMITTED: API Router layer
+ 
+ import sqlite3
++import threading
+ from datetime import datetime, timedelta, timezone
+ from typing import Any
+ 
+ import demo_app.core.config as _config
+-from demo_app.services.user_service import verify_user
++from demo_app.services.user_service import verify_user, log_failed_login
+ 
+ # Maximum consecutive failed attempts before the account is temporarily locked.
+ MAX_FAILED_ATTEMPTS = 5
+ # Lock duration in minutes after exceeding MAX_FAILED_ATTEMPTS.
+ LOCKOUT_MINUTES = 15
+ 
++# ---------------------------------------------------------------------------
++# In-memory token-bucket rate limiter
++# ---------------------------------------------------------------------------
++# Each key (email) gets a bucket of BUCKET_CAPACITY tokens that refills at
++# REFILL_RATE tokens-per-second.  Each login attempt consumes one token.
++# When the bucket is empty the request is rejected with HTTP 429.
++
++_BUCKET_CAPACITY: int = 5          # burst: up to 5 attempts in quick succession
++_REFILL_RATE: float = 1 / 60.0    # steady-state: 1 attempt per minute
++
++_buckets: dict[str, dict] = {}     # { email: {"tokens": float, "last_refill": float} }
++_bucket_lock = threading.Lock()
++
++
++def _consume_token(email: str) -> bool:
++    """Try to consume one token for *email*.
++
++    Returns True if a token was available (request allowed), False if the
++    bucket is empty (request should be rate-limited).
++    """
++    import time
++    now = time.monotonic()
++    with _bucket_lock:
++        bucket = _buckets.get(email)
++        if bucket is None:
++            # First request: full bucket, consume one immediately.
++            _buckets[email] = {"tokens": float(_BUCKET_CAPACITY - 1), "last_refill": now}
++            return True
++
++        # Refill tokens proportional to elapsed time since last check.
++        elapsed = now - bucket["last_refill"]
++        bucket["tokens"] = min(
++            float(_BUCKET_CAPACITY),
++            bucket["tokens"] + elapsed * _REFILL_RATE,
++        )
++        bucket["last_refill"] = now
++
++        if bucket["tokens"] >= 1.0:
++            bucket["tokens"] -= 1.0
++            return True
++        return False
++
+ 
+ def _get_db_path() -> str:
+     """Derive the SQLite file path from DATABASE_URL (``sqlite:///./path``)."""
+@@ -91,12 +134,17 @@ def login_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
+     email: str = payload.get("email", "")
+     password: str = payload.get("password", "")
+ 
++    # Token-bucket check: reject if the per-email request rate is exceeded.
++    if not _consume_token(email):
++        return {"error": "Too many requests — please slow down", "status": 429}
++
+     if _is_locked(email):
+         return {"error": "Account temporarily locked due to too many failed attempts", "status": 429}
+ 
+     user = verify_user(email, password)
+     if not user:
+         _record_failure(email)
++        log_failed_login(email)
+         return {"error": "Invalid credentials", "status": 401}
+ 
+     _clear_failures(email)
+diff --git a/demo_app/services/user_service.py b/demo_app/services/user_service.py
+index 4d690f1..21069fe 100644
+--- a/demo_app/services/user_service.py
++++ b/demo_app/services/user_service.py
+@@ -3,7 +3,7 @@
+ 
+ import re
+ from datetime import datetime, timedelta, timezone
+-from typing import Optional, Dict, Any
++from typing import Optional, Dict, Any, List
+ 
+ # Mock in-memory user repository
+ USERS_DB: Dict[str, Dict[str, str]] = {
+@@ -82,6 +82,33 @@ def clear_failed_attempts(email: str) -> None:
+     _LOCKOUT_TRACKER.pop(email, None)
+ 
+ 
++# ---------------------------------------------------------------------------
++# Failed login persistence (in-memory log)
++# ---------------------------------------------------------------------------
++# Stores a chronological record of failed login attempts so that callers can
++# audit or export them without touching the database schema.
++
++_FAILED_LOGIN_LOG: List[Dict[str, Any]] = []
++
++
++def log_failed_login(email: str) -> None:
++    """Append a failed login event to the in-memory log.
++
++    Args:
++        email: The email address that failed authentication.
++    """
++    _FAILED_LOGIN_LOG.append(
++        {"email": email, "attempted_at": datetime.now(timezone.utc).isoformat()}
++    )
++
++
++def get_failed_logins(email: Optional[str] = None) -> List[Dict[str, Any]]:
++    """Return recorded failed login events, optionally filtered by *email*."""
++    if email is None:
++        return list(_FAILED_LOGIN_LOG)
++    return [e for e in _FAILED_LOGIN_LOG if e["email"] == email]
++
++
+ # ---------------------------------------------------------------------------
+ # User verification
+ # ---------------------------------------------------------------------------

@@ -1,0 +1,6 @@
+command: ['python', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'tests/test_hidden_markdown.py']
+returncode: 0
+elapsed: 0.253s
+
+.                                                                        [100%]
+1 passed in 0.05s

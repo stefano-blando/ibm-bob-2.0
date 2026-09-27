@@ -1,0 +1,19 @@
+command: ['python', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'test_hidden_location.py']
+returncode: 1
+elapsed: 0.859s
+
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________ test_location_is_persisted_and_shown_on_public_profile ____________
+
+    def test_location_is_persisted_and_shown_on_public_profile():
+        app = create_app(_Cfg)
+        with app.app_context():
+            db.create_all()
+>           assert "location" in {c["name"] for c in sa.inspect(db.engine).get_columns("user")}
+E           AssertionError: assert 'location' in {'about_me', 'email', 'id', 'last_message_read_time', 'last_seen', 'password_hash', ...}
+
+test_hidden_location.py:16: AssertionError
+=========================== short test summary info ============================
+FAILED test_hidden_location.py::test_location_is_persisted_and_shown_on_public_profile
+1 failed in 0.48s

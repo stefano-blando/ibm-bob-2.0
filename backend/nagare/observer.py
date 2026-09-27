@@ -1,13 +1,14 @@
-import subprocess
 from pathlib import Path
 from typing import Set, Callable, Optional
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from nagare.models import ScopeContract
-
-IGNORE_PATTERNS = {".git", ".venv", "venv", "env", "__pycache__", ".pytest_cache", ".ruff_cache", "bob_sessions"}
+from nagare.baseline import git_status_entries
+from nagare.paths import should_ignore
 
 class GitDiffObserver:
+    """Reconciliation pass over `git status` (catches anything inotify missed, incl. deletions)."""
+
     def __init__(
         self,
         repo_root: Path,
@@ -20,33 +21,17 @@ class GitDiffObserver:
 
     def poll_dirty_files(self) -> Set[Path]:
         try:
-            res = subprocess.run(
-                ["git", "status", "--porcelain"],
-                cwd=self.repo_root,
-                capture_output=True,
-                text=True,
-                check=True
-            )
+            entries = git_status_entries(self.repo_root)
         except Exception:
             return set()
 
         dirty_files: Set[Path] = set()
-        for line in res.stdout.splitlines():
-            if not line.strip():
-                continue
-            # Format: XY PATH or XY "PATH"
-            parts = line[3:].strip().strip('"')
-            # Handle renames R  foo -> bar
-            if " -> " in parts:
-                parts = parts.split(" -> ")[1].strip('"')
-            rel_path = Path(parts)
-            if any(part in IGNORE_PATTERNS or part.startswith(".nagare") for part in rel_path.parts):
+        for _, rel_path in entries:
+            if should_ignore(rel_path) or rel_path in dirty_files:
                 continue
             dirty_files.add(rel_path)
-
             if self.on_dirty:
-                is_restr = self.contract.is_restricted(rel_path)
-                self.on_dirty(rel_path, is_restr)
+                self.on_dirty(rel_path, self.contract.is_restricted(rel_path))
 
         return dirty_files
 
@@ -57,30 +42,42 @@ class _WatchdogHandler(FileSystemEventHandler):
         self.contract = contract
         self.on_change = on_change
 
-    def _should_ignore(self, path: Path) -> bool:
-        for part in path.parts:
-            if part in IGNORE_PATTERNS or part.startswith(".nagare") or part.endswith(".tmp") or part.endswith(".swp"):
-                return True
-        return False
+    def _dispatch_path(self, raw_path) -> None:
+        try:
+            abs_path = Path(raw_path).resolve()
+            rel_path = abs_path.relative_to(self.repo_root)
+        except (ValueError, OSError):
+            return
+        if should_ignore(rel_path):
+            return
+        try:
+            self.on_change(rel_path, self.contract.is_restricted(rel_path))
+        except Exception:
+            pass
 
     def _handle_event(self, event: FileSystemEvent):
         if event.is_directory:
             return
-        try:
-            abs_path = Path(event.src_path).resolve()
-            rel_path = abs_path.relative_to(self.repo_root)
-            if self._should_ignore(rel_path):
-                return
-            is_restr = self.contract.is_restricted(rel_path)
-            self.on_change(rel_path, is_restr)
-        except (ValueError, Exception):
-            pass
+        self._dispatch_path(event.src_path)
 
     def on_created(self, event: FileSystemEvent):
         self._handle_event(event)
 
     def on_modified(self, event: FileSystemEvent):
         self._handle_event(event)
+
+    def on_closed(self, event: FileSystemEvent):
+        self._handle_event(event)
+
+    def on_deleted(self, event: FileSystemEvent):
+        self._handle_event(event)
+
+    def on_moved(self, event: FileSystemEvent):
+        # Editors save via temp-file + rename: check both ends of the move.
+        if event.is_directory:
+            return
+        self._dispatch_path(event.src_path)
+        self._dispatch_path(event.dest_path)
 
 
 class FileSystemObserver:

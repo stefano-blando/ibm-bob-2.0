@@ -1,0 +1,13 @@
+diff --git a/hc/lib/date.py b/hc/lib/date.py
+index 394e175..e9715c6 100644
+--- a/hc/lib/date.py
++++ b/hc/lib/date.py
+@@ -69,7 +69,7 @@ def format_approx_duration(duration: timedelta) -> str:
+     hours, mins = divmod(mins, 60)
+     days, hours = divmod(hours, 24)
+ 
+-    if days != 1:
++    if days == 1:
+         return f"1 day {hours} h"
+ 
+     if days:

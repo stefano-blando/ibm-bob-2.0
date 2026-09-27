@@ -1,0 +1,50 @@
+diff --git a/flaskr/__init__.py b/flaskr/__init__.py
+index ab96e71..4a9dfc6 100644
+--- a/flaskr/__init__.py
++++ b/flaskr/__init__.py
+@@ -39,6 +39,8 @@ def create_app(test_config=None):
+     app.register_blueprint(auth.bp)
+     app.register_blueprint(blog.bp)
+ 
++    app.jinja_env.filters["render_markdown"] = blog.render_markdown
++
+     # make url_for('index') == url_for('blog.index')
+     # in another app, you might define a separate main index here with
+     # app.route, while giving the blog blueprint a url_prefix, but for
+diff --git a/flaskr/blog.py b/flaskr/blog.py
+index be0d92c..d4f38a6 100644
+--- a/flaskr/blog.py
++++ b/flaskr/blog.py
+@@ -1,3 +1,5 @@
++from markdown_it import MarkdownIt
++
+ from flask import Blueprint
+ from flask import flash
+ from flask import g
+@@ -12,6 +14,13 @@ from .db import get_db
+ 
+ bp = Blueprint("blog", __name__)
+ 
++_md = MarkdownIt(options_update={"html": False})
++
++
++def render_markdown(text):
++    """Render *text* as Markdown HTML with raw HTML escaped."""
++    return _md.render(text)
++
+ 
+ @bp.route("/")
+ def index():
+diff --git a/flaskr/templates/blog/index.html b/flaskr/templates/blog/index.html
+index 3481b8e..e209773 100644
+--- a/flaskr/templates/blog/index.html
++++ b/flaskr/templates/blog/index.html
+@@ -19,7 +19,7 @@
+           <a class="action" href="{{ url_for('blog.update', id=post['id']) }}">Edit</a>
+         {% endif %}
+       </header>
+-      <p class="body">{{ post['body'] }}</p>
++      <div class="body">{{ post['body'] | render_markdown | safe }}</div>
+     </article>
+     {% if not loop.last %}
+       <hr>

@@ -1,0 +1,130 @@
+diff --git a/app/auth/routes.py b/app/auth/routes.py
+index 79360ff..a4b5322 100644
+--- a/app/auth/routes.py
++++ b/app/auth/routes.py
+@@ -1,4 +1,4 @@
+-from flask import render_template, redirect, url_for, flash, request
++from flask import render_template, redirect, url_for, flash, request, abort
+ from urllib.parse import urlsplit
+ from flask_login import login_user, logout_user, current_user
+ from flask_babel import _
+@@ -9,19 +9,26 @@ from app.auth.forms import LoginForm, RegistrationForm, \
+     ResetPasswordRequestForm, ResetPasswordForm
+ from app.models import User
+ from app.auth.email import send_password_reset_email
++from app.auth.rate_limit import is_rate_limited, record_failed_attempt, \
++    clear_attempts
+ 
+ 
+ @bp.route('/login', methods=['GET', 'POST'])
+ def login():
+     if current_user.is_authenticated:
+         return redirect(url_for('main.index'))
++    ip = request.remote_addr
++    if request.method == 'POST' and is_rate_limited(ip):
++        abort(429)
+     form = LoginForm()
+     if form.validate_on_submit():
+         user = db.session.scalar(
+             sa.select(User).where(User.username == form.username.data))
+         if user is None or not user.check_password(form.password.data):
++            record_failed_attempt(ip)
+             flash(_('Invalid username or password'))
+             return redirect(url_for('auth.login'))
++        clear_attempts(ip)
+         login_user(user, remember=form.remember_me.data)
+         next_page = request.args.get('next')
+         if not next_page or urlsplit(next_page).netloc != '':
+
+diff --git a/app/auth/rate_limit.py b/app/auth/rate_limit.py
+new file mode 100644
+--- /dev/null
++++ b/app/auth/rate_limit.py
++"""
++IP-based brute-force protection for the login endpoint.
++
++Tracks failed login attempts per remote IP using a sliding-window counter.
++After LOGIN_ATTEMPT_LIMIT failures within LOGIN_ATTEMPT_WINDOW seconds the
++caller is considered rate-limited.
++
++Storage back-end priority:
++  1. Redis (via current_app.redis) — preferred for multi-process deployments.
++  2. In-process dict — automatic fallback when Redis is unavailable (e.g. tests).
++"""
++import threading
++import time
++
++from flask import current_app
++
++# --- configuration constants -------------------------------------------------
++LIMIT = 5       # max failed attempts before lockout
++WINDOW = 60     # sliding window in seconds
++# -----------------------------------------------------------------------------
++
++# In-process fallback store: { ip: [timestamp, ...] }
++_local_store: dict[str, list[float]] = {}
++_local_lock = threading.Lock()
++
++
++def _redis_key(ip: str) -> str:
++    return f"login_fail:{ip}"
++
++
++def record_failed_attempt(ip: str) -> None:
++    """Record one failed login attempt for *ip*."""
++    try:
++        r = current_app.redis
++        key = _redis_key(ip)
++        now = time.time()
++        pipe = r.pipeline()
++        pipe.rpush(key, now)
++        pipe.expire(key, WINDOW)
++        pipe.execute()
++    except Exception:
++        _local_record(ip)
++
++
++def is_rate_limited(ip: str) -> bool:
++    """Return True if *ip* has exceeded the failure limit within the window."""
++    try:
++        r = current_app.redis
++        key = _redis_key(ip)
++        raw = r.lrange(key, 0, -1)
++        cutoff = time.time() - WINDOW
++        recent = [float(v) for v in raw if float(v) > cutoff]
++        return len(recent) >= LIMIT
++    except Exception:
++        return _local_is_limited(ip)
++
++
++def clear_attempts(ip: str) -> None:
++    """Clear the failure counter for *ip* (called on successful login)."""
++    try:
++        r = current_app.redis
++        r.delete(_redis_key(ip))
++    except Exception:
++        with _local_lock:
++            _local_store.pop(ip, None)
++
++
++# --- in-process fallback helpers ---------------------------------------------
++
++def _local_record(ip: str) -> None:
++    now = time.time()
++    with _local_lock:
++        timestamps = _local_store.setdefault(ip, [])
++        timestamps.append(now)
++        # prune old entries to keep the list bounded
++        cutoff = now - WINDOW
++        _local_store[ip] = [t for t in timestamps if t > cutoff]
++
++
++def _local_is_limited(ip: str) -> bool:
++    now = time.time()
++    cutoff = now - WINDOW
++    with _local_lock:
++        timestamps = _local_store.get(ip, [])
++        recent = [t for t in timestamps if t > cutoff]
++        # update pruned list in place
++        _local_store[ip] = recent
++        return len(recent) >= LIMIT

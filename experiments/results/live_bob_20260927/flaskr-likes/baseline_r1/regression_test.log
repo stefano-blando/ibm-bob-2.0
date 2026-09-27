@@ -1,0 +1,6 @@
+command: ['python', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'tests']
+returncode: 0
+elapsed: 1.044s
+
+................................                                         [100%]
+32 passed in 0.82s

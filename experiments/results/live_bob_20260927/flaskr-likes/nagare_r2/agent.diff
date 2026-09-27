@@ -1,0 +1,86 @@
+diff --git a/flaskr/blog.py b/flaskr/blog.py
+index be0d92c..bc9c972 100644
+--- a/flaskr/blog.py
++++ b/flaskr/blog.py
+@@ -18,8 +18,11 @@ def index():
+     """Show all the posts, most recent first."""
+     db = get_db()
+     posts = db.execute(
+-        "SELECT p.id, title, body, created, author_id, username"
++        "SELECT p.id, title, body, created, author_id, username,"
++        " COUNT(pl.user_id) AS like_count"
+         " FROM post p JOIN user u ON p.author_id = u.id"
++        " LEFT JOIN post_like pl ON pl.post_id = p.id"
++        " GROUP BY p.id"
+         " ORDER BY created DESC"
+     ).fetchall()
+     return render_template("blog/index.html", posts=posts)
+@@ -110,6 +113,31 @@ def update(id):
+     return render_template("blog/update.html", post=post)
+ 
+ 
++@bp.route("/<int:id>/like", methods=("POST",))
++@login_required
++def like(id):
++    """Toggle a like on a post for the current user."""
++    # Verify the post exists (no author check needed).
++    get_post(id, check_author=False)
++    db = get_db()
++    existing = db.execute(
++        "SELECT 1 FROM post_like WHERE user_id = ? AND post_id = ?",
++        (g.user["id"], id),
++    ).fetchone()
++    if existing is None:
++        db.execute(
++            "INSERT INTO post_like (user_id, post_id) VALUES (?, ?)",
++            (g.user["id"], id),
++        )
++    else:
++        db.execute(
++            "DELETE FROM post_like WHERE user_id = ? AND post_id = ?",
++            (g.user["id"], id),
++        )
++    db.commit()
++    return redirect(url_for("blog.index"))
++
++
+ @bp.route("/<int:id>/delete", methods=("POST",))
+ @login_required
+ def delete(id):
+diff --git a/flaskr/templates/blog/index.html b/flaskr/templates/blog/index.html
+index 3481b8e..72ae492 100644
+--- a/flaskr/templates/blog/index.html
++++ b/flaskr/templates/blog/index.html
+@@ -15,8 +15,15 @@
+           <h1>{{ post['title'] }}</h1>
+           <div class="about">by {{ post['username'] }} on {{ post['created'].strftime('%Y-%m-%d') }}</div>
+         </div>
+-        {% if g.user['id'] == post['author_id'] %}
+-          <a class="action" href="{{ url_for('blog.update', id=post['id']) }}">Edit</a>
++        {% if g.user %}
++          {% if g.user['id'] == post['author_id'] %}
++            <a class="action" href="{{ url_for('blog.update', id=post['id']) }}">Edit</a>
++          {% endif %}
++          <form action="{{ url_for('blog.like', id=post['id']) }}" method="post" style="display:inline;">
++            <button type="submit">&#x2665; {{ post['like_count'] }}</button>
++          </form>
++        {% else %}
++          <span>&#x2665; {{ post['like_count'] }}</span>
+         {% endif %}
+       </header>
+       <p class="body">{{ post['body'] }}</p>
+
+diff --git a/flaskr/likes_schema.sql b/flaskr/likes_schema.sql
+new file mode 100644
+--- /dev/null
++++ b/flaskr/likes_schema.sql
++-- Migration: add post_like table for the likes feature.
++-- Applied automatically by init_db() after the base schema.
++
++CREATE TABLE IF NOT EXISTS post_like (
++  user_id INTEGER NOT NULL,
++  post_id INTEGER NOT NULL,
++  PRIMARY KEY (user_id, post_id),
++  FOREIGN KEY (user_id) REFERENCES user (id),
++  FOREIGN KEY (post_id) REFERENCES post (id)
++);

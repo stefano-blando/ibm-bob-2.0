@@ -1,0 +1,181 @@
+diff --git a/demo_app/api/routes/auth.py b/demo_app/api/routes/auth.py
+index 3ffabf5..b8e196e 100644
+--- a/demo_app/api/routes/auth.py
++++ b/demo_app/api/routes/auth.py
+@@ -2,17 +2,74 @@
+ # PERMITTED: API Router layer
+ 
+ import sqlite3
++import threading
++import time
+ from datetime import datetime, timedelta, timezone
+ from typing import Any
+ 
+ import demo_app.core.config as _config
+-from demo_app.services.user_service import verify_user
++from demo_app.services.user_service import persist_failed_login, verify_user
+ 
+ # Maximum consecutive failed attempts before the account is temporarily locked.
+ MAX_FAILED_ATTEMPTS = 5
+ # Lock duration in minutes after exceeding MAX_FAILED_ATTEMPTS.
+ LOCKOUT_MINUTES = 15
+ 
++# ---------------------------------------------------------------------------
++# In-memory token-bucket rate limiter (per IP address)
++# ---------------------------------------------------------------------------
++# Each bucket allows BUCKET_CAPACITY requests, refilling at REFILL_RATE
++# tokens per second.  Once a bucket is empty the request is rejected with 429.
++
++BUCKET_CAPACITY: float = 10.0   # maximum burst size (tokens)
++REFILL_RATE: float = 1.0        # tokens added per second
++
++_buckets: dict[str, "_TokenBucket"] = {}
++_buckets_lock = threading.Lock()
++
++
++class _TokenBucket:
++    """Thread-safe token-bucket for a single client (identified by IP)."""
++
++    __slots__ = ("_tokens", "_last_refill", "_lock")
++
++    def __init__(self) -> None:
++        self._tokens: float = BUCKET_CAPACITY
++        self._last_refill: float = time.monotonic()
++        self._lock = threading.Lock()
++
++    def consume(self, tokens: float = 1.0) -> bool:
++        """Try to consume *tokens* from the bucket.
++
++        Returns True when the request is allowed, False when the bucket is
++        exhausted (caller should respond 429).
++        """
++        with self._lock:
++            now = time.monotonic()
++            elapsed = now - self._last_refill
++            self._tokens = min(
++                BUCKET_CAPACITY, self._tokens + elapsed * REFILL_RATE
++            )
++            self._last_refill = now
++            if self._tokens >= tokens:
++                self._tokens -= tokens
++                return True
++            return False
++
++
++def _get_bucket(client_ip: str) -> "_TokenBucket":
++    """Return (creating if necessary) the bucket for *client_ip*."""
++    with _buckets_lock:
++        bucket = _buckets.get(client_ip)
++        if bucket is None:
++            bucket = _TokenBucket()
++            _buckets[client_ip] = bucket
++        return bucket
++
++
++# ---------------------------------------------------------------------------
++# Database helpers (per-email DB-level lockout)
++# ---------------------------------------------------------------------------
+ 
+ def _get_db_path() -> str:
+     """Derive the SQLite file path from DATABASE_URL (``sqlite:///./path``)."""
+@@ -74,6 +131,10 @@ def _clear_failures(email: str) -> None:
+         conn.commit()
+ 
+ 
++# ---------------------------------------------------------------------------
++# Login endpoint
++# ---------------------------------------------------------------------------
++
+ def login_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
+     """Authenticate a user and return a session token.
+ 
+@@ -82,21 +143,31 @@ def login_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
+             Expected keys:
+                 - ``email`` (str): The user's email address.
+                 - ``password`` (str): The user's plain-text password.
++                - ``client_ip`` (str, optional): Caller IP for token-bucket
++                  throttling.  Defaults to ``"unknown"`` when absent.
+ 
+     Returns:
+-        On success:      ``{"token": str, "status": 200}``
+-        On locked:       ``{"error": str, "status": 429}``
+-        On bad creds:    ``{"error": str, "status": 401}``
++        On success:          ``{"token": str, "status": 200}``
++        On rate-limited:     ``{"error": str, "status": 429}``
++        On account locked:   ``{"error": str, "status": 429}``
++        On bad creds:        ``{"error": str, "status": 401}``
+     """
+     email: str = payload.get("email", "")
+     password: str = payload.get("password", "")
++    client_ip: str = payload.get("client_ip", "unknown")
++
++    # 1. Token-bucket check (per IP) — fast, in-memory, no DB round-trip.
++    if not _get_bucket(client_ip).consume():
++        return {"error": "Too many requests, please slow down", "status": 429}
+ 
++    # 2. Per-email DB-level lockout check.
+     if _is_locked(email):
+         return {"error": "Account temporarily locked due to too many failed attempts", "status": 429}
+ 
+     user = verify_user(email, password)
+     if not user:
+         _record_failure(email)
++        persist_failed_login(email, client_ip)
+         return {"error": "Invalid credentials", "status": 401}
+ 
+     _clear_failures(email)
+diff --git a/demo_app/services/user_service.py b/demo_app/services/user_service.py
+index 4d690f1..1f5f4ee 100644
+--- a/demo_app/services/user_service.py
++++ b/demo_app/services/user_service.py
+@@ -2,9 +2,12 @@
+ # PERMITTED: Business logic layer
+ 
+ import re
++import sqlite3
+ from datetime import datetime, timedelta, timezone
+ from typing import Optional, Dict, Any
+ 
++import demo_app.core.config as _config
++
+ # Mock in-memory user repository
+ USERS_DB: Dict[str, Dict[str, str]] = {
+     "alice@example.com": {"password": "password123", "role": "admin"},
+@@ -91,3 +94,37 @@ def verify_user(email: str, password: str) -> Optional[Dict[str, str]]:
+     if user and user["password"] == password:
+         return {"email": email, "role": user["role"]}
+     return None
++
++
++# ---------------------------------------------------------------------------
++# Failed-login persistence (requires failed_logins table in schema.sql)
++# ---------------------------------------------------------------------------
++
++def _get_db_path() -> str:
++    return _config.DATABASE_URL.replace("sqlite:///", "")
++
++
++def persist_failed_login(email: str, client_ip: str = "unknown") -> None:
++    """Insert a row into *failed_logins* recording this failed attempt.
++
++    This is a best-effort write: if the table does not yet exist (e.g. schema
++    migration has not been applied) the error is silently swallowed so that it
++    never breaks the authentication flow.
++    """
++    now = datetime.now(timezone.utc).isoformat()
++    try:
++        conn = sqlite3.connect(_get_db_path())
++        try:
++            conn.execute(
++                """
++                INSERT INTO failed_logins (email, client_ip, attempted_at)
++                VALUES (?, ?, ?)
++                """,
++                (email, client_ip, now),
++            )
++            conn.commit()
++        finally:
++            conn.close()
++    except sqlite3.OperationalError:
++        # Table does not exist yet — schema migration pending.
++        pass

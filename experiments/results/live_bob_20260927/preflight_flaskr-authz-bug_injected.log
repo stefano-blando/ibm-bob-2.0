@@ -1,0 +1,93 @@
+command: ['python', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'tests']
+returncode: 1
+elapsed: 1.494s
+
+............F...F.FF....                                                 [100%]
+=================================== FAILURES ===================================
+_____________________________ test_author_required _____________________________
+
+app = <Flask 'flaskr'>, client = <FlaskClient <Flask 'flaskr'>>
+auth = <conftest.AuthActions object at 0x7192f2c13140>
+
+    def test_author_required(app, client, auth):
+        # change the post author to another user
+        with app.app_context():
+            db = get_db()
+            db.execute("UPDATE post SET author_id = 2 WHERE id = 1")
+            db.commit()
+    
+        auth.login()
+        # current user can't modify other user's post
+>       assert client.post("/1/update").status_code == 403
+E       AssertionError: assert 400 == 403
+E        +  where 400 = <WrapperTestResponse streamed [400 BAD REQUEST]>.status_code
+E        +    where <WrapperTestResponse streamed [400 BAD REQUEST]> = post('/1/update')
+E        +      where post = <FlaskClient <Flask 'flaskr'>>.post
+
+tests/test_blog.py:34: AssertionError
+_________________________________ test_update __________________________________
+
+client = <FlaskClient <Flask 'flaskr'>>
+auth = <conftest.AuthActions object at 0x7192f2c34a10>, app = <Flask 'flaskr'>
+
+    def test_update(client, auth, app):
+        auth.login()
+>       assert client.get("/1/update").status_code == 200
+E       AssertionError: assert 403 == 200
+E        +  where 403 = <WrapperTestResponse streamed [403 FORBIDDEN]>.status_code
+E        +    where <WrapperTestResponse streamed [403 FORBIDDEN]> = get('/1/update')
+E        +      where get = <FlaskClient <Flask 'flaskr'>>.get
+
+tests/test_blog.py:59: AssertionError
+____________________ test_create_update_validate[/1/update] ____________________
+
+client = <FlaskClient <Flask 'flaskr'>>
+auth = <conftest.AuthActions object at 0x7192f2c36ba0>, path = '/1/update'
+
+    @pytest.mark.parametrize("path", ("/create", "/1/update"))
+    def test_create_update_validate(client, auth, path):
+        auth.login()
+        response = client.post(path, data={"title": "", "body": ""})
+>       assert b"Title is required." in response.data
+E       AssertionError: assert b'Title is required.' in b'<!doctype html>\n<html lang=en>\n<title>403 Forbidden</title>\n<h1>Forbidden</h1>\n<p>You don&#39;t have the permission to access the requested resource. It is either read-protected or not readable by the server.</p>\n'
+E        +  where b'<!doctype html>\n<html lang=en>\n<title>403 Forbidden</title>\n<h1>Forbidden</h1>\n<p>You don&#39;t have the permission to access the requested resource. It is either read-protected or not readable by the server.</p>\n' = <WrapperTestResponse 213 bytes [403 FORBIDDEN]>.data
+
+tests/test_blog.py:72: AssertionError
+_________________________________ test_delete __________________________________
+
+client = <FlaskClient <Flask 'flaskr'>>
+auth = <conftest.AuthActions object at 0x7192f2c11790>, app = <Flask 'flaskr'>
+
+    def test_delete(client, auth, app):
+        auth.login()
+        response = client.post("/1/delete")
+>       assert response.headers["Location"] == "/"
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_blog.py:78: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/werkzeug/datastructures/headers.py:83: in __getitem__
+    return self._get_key(key)
+           ^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = Headers([('Content-Type', 'text/html; charset=utf-8'), ('Content-Length', '213'), ('Vary', 'Cookie')])
+key = 'Location'
+
+    def _get_key(self, key: str) -> str:
+        ikey = key.lower()
+    
+        for k, v in self._list:
+            if k.lower() == ikey:
+                return v
+    
+>       raise BadRequestKeyError(key)
+E       werkzeug.exceptions.BadRequestKeyError: 400 Bad Request: The browser (or proxy) sent a request that this server could not understand.
+
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/werkzeug/datastructures/headers.py:97: BadRequestKeyError
+=========================== short test summary info ============================
+FAILED tests/test_blog.py::test_author_required - AssertionError: assert 400 ...
+FAILED tests/test_blog.py::test_update - AssertionError: assert 403 == 200
+FAILED tests/test_blog.py::test_create_update_validate[/1/update] - Assertion...
+FAILED tests/test_blog.py::test_delete - werkzeug.exceptions.BadRequestKeyErr...
+4 failed, 20 passed in 1.25s

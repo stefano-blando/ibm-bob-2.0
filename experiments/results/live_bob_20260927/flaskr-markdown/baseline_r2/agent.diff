@@ -1,0 +1,44 @@
+diff --git a/flaskr/__init__.py b/flaskr/__init__.py
+index ab96e71..6083bc1 100644
+--- a/flaskr/__init__.py
++++ b/flaskr/__init__.py
+@@ -1,6 +1,17 @@
+ import os
+ 
+ from flask import Flask
++from markdown_it import MarkdownIt
++from markupsafe import Markup
++from markupsafe import escape
++
++
++_md = MarkdownIt()
++
++
++def _render_markdown(text):
++    """Escape raw HTML in *text*, then render Markdown to a safe HTML string."""
++    return Markup(_md.render(str(escape(text))))
+ 
+ 
+ def create_app(test_config=None):
+@@ -23,6 +34,8 @@ def create_app(test_config=None):
+     # ensure the instance folder exists
+     os.makedirs(app.instance_path, exist_ok=True)
+ 
++    app.jinja_env.filters["render_markdown"] = _render_markdown
++
+     @app.route("/hello")
+     def hello():
+         return "Hello, World!"
+diff --git a/flaskr/templates/blog/index.html b/flaskr/templates/blog/index.html
+index 3481b8e..55c4cb4 100644
+--- a/flaskr/templates/blog/index.html
++++ b/flaskr/templates/blog/index.html
+@@ -19,7 +19,7 @@
+           <a class="action" href="{{ url_for('blog.update', id=post['id']) }}">Edit</a>
+         {% endif %}
+       </header>
+-      <p class="body">{{ post['body'] }}</p>
++      <div class="body">{{ post['body'] | render_markdown }}</div>
+     </article>
+     {% if not loop.last %}
+       <hr>

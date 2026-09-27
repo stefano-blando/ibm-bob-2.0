@@ -1,0 +1,9 @@
+command: ['python', 'manage.py', 'test', '-v', '0', 'hc.lib.tests.test_date']
+returncode: 0
+elapsed: 0.401s
+
+System check identified no issues (0 silenced).
+----------------------------------------------------------------------
+Ran 17 tests in 0.001s
+
+OK

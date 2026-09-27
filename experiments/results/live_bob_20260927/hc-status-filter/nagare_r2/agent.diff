@@ -1,0 +1,151 @@
+diff --git a/hc/api/views.py b/hc/api/views.py
+index 9c344e0..2559a0c 100644
+--- a/hc/api/views.py
++++ b/hc/api/views.py
+@@ -410,6 +410,9 @@ def _update(check: Check, spec: Spec, v: int) -> None:
+         check.channel_set.set(new_channels)
+ 
+ 
++VALID_STATUSES = {"new", "up", "down", "paused", "grace", "started"}
++
++
+ @authorize_read
+ def get_checks(request: ApiRequest) -> JsonResponse:
+     q = Check.objects.filter(project=request.project)
+@@ -426,11 +429,17 @@ def get_checks(request: ApiRequest) -> JsonResponse:
+     if slug := request.GET.get("slug"):
+         q = q.filter(slug=slug)
+ 
++    status_filter = request.GET.get("status") if request.v >= 3 else None
++    if status_filter is not None and status_filter not in VALID_STATUSES:
++        return JsonResponse({"error": "invalid status value"}, status=400)
++
+     checks = []
+     for check in q:
+         # precise, final filtering
+         if not tags or check.matches_tag_set(tags):
+-            checks.append(check.to_dict(readonly=request.readonly, v=request.v))
++            d = check.to_dict(readonly=request.readonly, v=request.v)
++            if status_filter is None or d["status"] == status_filter:
++                checks.append(d)
+ 
+     return JsonResponse({"checks": checks})
+ 
+
+diff --git a/hc/api/tests/test_list_checks_status_filter.py b/hc/api/tests/test_list_checks_status_filter.py
+new file mode 100644
+--- /dev/null
++++ b/hc/api/tests/test_list_checks_status_filter.py
++from __future__ import annotations
++
++from datetime import timedelta as td
++
++from django.utils.timezone import now
++
++from hc.api.models import Check
++from hc.test import BaseTestCase
++
++
++class ListChecksStatusFilterTestCase(BaseTestCase):
++    def setUp(self) -> None:
++        super().setUp()
++
++        self.check_new = Check(project=self.project, name="New Check")
++        self.check_new.status = "new"
++        self.check_new.save()
++
++        self.check_up = Check(project=self.project, name="Up Check")
++        self.check_up.status = "up"
++        self.check_up.last_ping = now()
++        self.check_up.save()
++
++        self.check_down = Check(project=self.project, name="Down Check")
++        self.check_down.status = "down"
++        self.check_down.save()
++
++        self.check_paused = Check(project=self.project, name="Paused Check")
++        self.check_paused.status = "paused"
++        self.check_paused.save()
++
++    def get_v3(self, status: str) -> object:
++        return self.client.get(
++            f"/api/v3/checks/?status={status}", HTTP_X_API_KEY="X" * 32
++        )
++
++    def test_filter_by_status_down(self) -> None:
++        r = self.get_v3("down")
++        self.assertEqual(r.status_code, 200)
++        doc = r.json()
++        self.assertEqual(len(doc["checks"]), 1)
++        self.assertEqual(doc["checks"][0]["name"], "Down Check")
++
++    def test_filter_by_status_up(self) -> None:
++        r = self.get_v3("up")
++        self.assertEqual(r.status_code, 200)
++        doc = r.json()
++        names = [c["name"] for c in doc["checks"]]
++        self.assertIn("Up Check", names)
++        for check in doc["checks"]:
++            self.assertEqual(check["status"], "up")
++
++    def test_filter_by_status_new(self) -> None:
++        r = self.get_v3("new")
++        self.assertEqual(r.status_code, 200)
++        doc = r.json()
++        self.assertEqual(len(doc["checks"]), 1)
++        self.assertEqual(doc["checks"][0]["name"], "New Check")
++
++    def test_filter_by_status_paused(self) -> None:
++        r = self.get_v3("paused")
++        self.assertEqual(r.status_code, 200)
++        doc = r.json()
++        self.assertEqual(len(doc["checks"]), 1)
++        self.assertEqual(doc["checks"][0]["name"], "Paused Check")
++
++    def test_filter_returns_empty_when_no_match(self) -> None:
++        # No checks are in "grace" state in this test setup
++        r = self.get_v3("grace")
++        self.assertEqual(r.status_code, 200)
++        doc = r.json()
++        self.assertEqual(len(doc["checks"]), 0)
++
++    def test_invalid_status_returns_400(self) -> None:
++        r = self.get_v3("invalid")
++        self.assertEqual(r.status_code, 400)
++        self.assertIn("error", r.json())
++
++    def test_status_filter_ignored_on_v1(self) -> None:
++        # ?status= is only honoured on v3; v1 should return all checks
++        r = self.client.get(
++            "/api/v1/checks/?status=down", HTTP_X_API_KEY="X" * 32
++        )
++        self.assertEqual(r.status_code, 200)
++        doc = r.json()
++        # All 4 checks should be returned, not just the "down" one
++        self.assertEqual(len(doc["checks"]), 4)
++
++    def test_status_filter_ignored_on_v2(self) -> None:
++        # ?status= is only honoured on v3; v2 should return all checks
++        r = self.client.get(
++            "/api/v2/checks/?status=down", HTTP_X_API_KEY="X" * 32
++        )
++        self.assertEqual(r.status_code, 200)
++        doc = r.json()
++        self.assertEqual(len(doc["checks"]), 4)
++
++    def test_filter_by_status_started(self) -> None:
++        # A check that is currently "started" (has recent last_start)
++        check_started = Check(project=self.project, name="Started Check")
++        check_started.status = "up"
++        check_started.last_ping = now()
++        check_started.last_start = now()
++        check_started.grace = td(hours=1)
++        check_started.save()
++
++        r = self.get_v3("started")
++        self.assertEqual(r.status_code, 200)
++        doc = r.json()
++        names = [c["name"] for c in doc["checks"]]
++        self.assertIn("Started Check", names)
++        for check in doc["checks"]:
++            self.assertEqual(check["status"], "started")

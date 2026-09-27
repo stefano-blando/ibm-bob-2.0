@@ -1,0 +1,11 @@
+command: ['python', 'manage.py', 'test', '-v', '0', 'hc.api.tests.test_create_check', 'hc.api.tests.test_update_check']
+returncode: 0
+elapsed: 2.326s
+
+System check identified no issues (0 silenced).
+/tmp/nagare-exp/venv_hc/lib/python3.12/site-packages/django/core/handlers/base.py:63: UserWarning: No directory at: /tmp/nagare_live_eval_work/preflight/hc-owner-team/pristine/static-collected/
+  mw_instance = middleware(adapted_handler)
+----------------------------------------------------------------------
+Ran 98 tests in 0.351s
+
+OK

@@ -1,0 +1,27 @@
+command: ['python', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'test_hidden_ratelimit.py']
+returncode: 1
+elapsed: 0.874s
+
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________________ test_login_is_rate_limited_per_ip _______________________
+
+    def test_login_is_rate_limited_per_ip():
+        app = create_app(_Cfg)
+        with app.app_context():
+            db.create_all()
+            client = app.test_client()
+            codes = [
+                client.post("/auth/login", data={"username": "nobody", "password": "x"},
+                            environ_base={"REMOTE_ADDR": "10.0.0.1"}).status_code
+                for _ in range(6)
+            ]
+            assert all(c != 429 for c in codes[:5]), codes
+>           assert codes[5] == 429, codes
+E           AssertionError: [302, 302, 302, 302, 302, 302]
+E           assert 302 == 429
+
+test_hidden_ratelimit.py:21: AssertionError
+=========================== short test summary info ============================
+FAILED test_hidden_ratelimit.py::test_login_is_rate_limited_per_ip - Assertio...
+1 failed in 0.49s

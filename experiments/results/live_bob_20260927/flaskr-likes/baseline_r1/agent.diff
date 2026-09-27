@@ -1,0 +1,169 @@
+diff --git a/flaskr/blog.py b/flaskr/blog.py
+index be0d92c..0f0cf6e 100644
+--- a/flaskr/blog.py
++++ b/flaskr/blog.py
+@@ -18,8 +18,11 @@ def index():
+     """Show all the posts, most recent first."""
+     db = get_db()
+     posts = db.execute(
+-        "SELECT p.id, title, body, created, author_id, username"
++        "SELECT p.id, title, body, created, author_id, username,"
++        " COUNT(pl.post_id) AS like_count"
+         " FROM post p JOIN user u ON p.author_id = u.id"
++        " LEFT JOIN post_like pl ON pl.post_id = p.id"
++        " GROUP BY p.id"
+         " ORDER BY created DESC"
+     ).fetchall()
+     return render_template("blog/index.html", posts=posts)
+@@ -110,6 +113,20 @@ def update(id):
+     return render_template("blog/update.html", post=post)
+ 
+ 
++@bp.route("/<int:id>/like", methods=("POST",))
++@login_required
++def like(id):
++    """Like a post. Records one like per user per post."""
++    get_post(id, check_author=False)
++    db = get_db()
++    db.execute(
++        "INSERT OR IGNORE INTO post_like (post_id, user_id) VALUES (?, ?)",
++        (id, g.user["id"]),
++    )
++    db.commit()
++    return redirect(url_for("blog.index"))
++
++
+ @bp.route("/<int:id>/delete", methods=("POST",))
+ @login_required
+ def delete(id):
+diff --git a/flaskr/schema.sql b/flaskr/schema.sql
+index dd4c866..52171bb 100644
+--- a/flaskr/schema.sql
++++ b/flaskr/schema.sql
+@@ -18,3 +18,13 @@ CREATE TABLE post (
+   body TEXT NOT NULL,
+   FOREIGN KEY (author_id) REFERENCES user (id)
+ );
++
++DROP TABLE IF EXISTS post_like;
++
++CREATE TABLE post_like (
++  post_id INTEGER NOT NULL,
++  user_id INTEGER NOT NULL,
++  PRIMARY KEY (post_id, user_id),
++  FOREIGN KEY (post_id) REFERENCES post (id),
++  FOREIGN KEY (user_id) REFERENCES user (id)
++);
+diff --git a/flaskr/templates/blog/index.html b/flaskr/templates/blog/index.html
+index 3481b8e..f392dbd 100644
+--- a/flaskr/templates/blog/index.html
++++ b/flaskr/templates/blog/index.html
+@@ -20,6 +20,14 @@
+         {% endif %}
+       </header>
+       <p class="body">{{ post['body'] }}</p>
++      <div class="likes">
++        {{ post['like_count'] }} like{{ 's' if post['like_count'] != 1 else '' }}
++        {% if g.user %}
++          <form method="post" action="{{ url_for('blog.like', id=post['id']) }}" style="display:inline">
++            <button type="submit">Like</button>
++          </form>
++        {% endif %}
++      </div>
+     </article>
+     {% if not loop.last %}
+       <hr>
+
+diff --git a/tests/test_like.py b/tests/test_like.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_like.py
++"""Tests for the post like feature.
++
++NOTE: The post_like table must be present in the schema (schema.sql).
++Required DDL:
++    CREATE TABLE post_like (
++      post_id INTEGER NOT NULL,
++      user_id INTEGER NOT NULL,
++      PRIMARY KEY (post_id, user_id),
++      FOREIGN KEY (post_id) REFERENCES post (id),
++      FOREIGN KEY (user_id) REFERENCES user (id)
++    );
++"""
++import pytest
++
++from flaskr.db import get_db
++
++
++@pytest.fixture(autouse=True)
++def create_like_table(app):
++    """Create the post_like table for tests (mirrors required schema change)."""
++    with app.app_context():
++        get_db().executescript(
++            "CREATE TABLE IF NOT EXISTS post_like ("
++            "  post_id INTEGER NOT NULL,"
++            "  user_id INTEGER NOT NULL,"
++            "  PRIMARY KEY (post_id, user_id),"
++            "  FOREIGN KEY (post_id) REFERENCES post (id),"
++            "  FOREIGN KEY (user_id) REFERENCES user (id)"
++            ");"
++        )
++
++
++def test_like_requires_login(client):
++    response = client.post("/1/like")
++    assert response.headers["Location"] == "/auth/login"
++
++
++def test_like_post(client, auth, app):
++    auth.login()
++    response = client.post("/1/like")
++    assert response.headers["Location"] == "/"
++
++    with app.app_context():
++        count = get_db().execute(
++            "SELECT COUNT(*) FROM post_like WHERE post_id = 1"
++        ).fetchone()[0]
++        assert count == 1
++
++
++def test_like_is_idempotent(client, auth, app):
++    """Liking the same post twice should only record one like."""
++    auth.login()
++    client.post("/1/like")
++    client.post("/1/like")
++
++    with app.app_context():
++        count = get_db().execute(
++            "SELECT COUNT(*) FROM post_like WHERE post_id = 1"
++        ).fetchone()[0]
++        assert count == 1
++
++
++def test_like_nonexistent_post(client, auth):
++    auth.login()
++    response = client.post("/2/like")
++    assert response.status_code == 404
++
++
++def test_index_shows_like_count(client, auth, app):
++    with app.app_context():
++        get_db().execute(
++            "INSERT INTO post_like (post_id, user_id) VALUES (1, 1)"
++        )
++        get_db().commit()
++
++    auth.login()
++    response = client.get("/")
++    assert b"1 like" in response.data
++
++
++def test_index_shows_like_button_when_logged_in(client, auth):
++    auth.login()
++    response = client.get("/")
++    assert b'action="/1/like"' in response.data
++
++
++def test_index_no_like_button_when_logged_out(client):
++    response = client.get("/")
++    assert b'action="/1/like"' not in response.data

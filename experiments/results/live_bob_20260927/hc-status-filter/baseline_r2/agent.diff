@@ -1,0 +1,35 @@
+diff --git a/hc/api/tests/test_list_checks.py b/hc/api/tests/test_list_checks.py
+index 387990b..2ba1c5f 100644
+--- a/hc/api/tests/test_list_checks.py
++++ b/hc/api/tests/test_list_checks.py
+@@ -191,3 +191,30 @@ class ListChecksTestCase(BaseTestCase):
+         self.assertEqual(len(doc["checks"]), 1)
+         check = doc["checks"][0]
+         self.assertEqual(check["name"], "Alice 1")
++
++    def test_v3_filters_by_status(self) -> None:
++        r = self.client.get("/api/v3/checks/?status=up", HTTP_X_API_KEY="X" * 32)
++        self.assertEqual(r.status_code, 200)
++
++        doc = r.json()
++        self.assertEqual(len(doc["checks"]), 1)
++        self.assertEqual(doc["checks"][0]["name"], "Alice 2")
++
++    def test_v3_filters_by_status_returns_empty(self) -> None:
++        r = self.client.get("/api/v3/checks/?status=down", HTTP_X_API_KEY="X" * 32)
++        self.assertEqual(r.status_code, 200)
++
++        doc = r.json()
++        self.assertEqual(len(doc["checks"]), 0)
++
++    def test_v3_rejects_invalid_status(self) -> None:
++        r = self.client.get("/api/v3/checks/?status=invalid", HTTP_X_API_KEY="X" * 32)
++        self.assertEqual(r.status_code, 400)
++
++    def test_v1_ignores_status_param(self) -> None:
++        r = self.client.get("/api/v1/checks/?status=up", HTTP_X_API_KEY="X" * 32)
++        self.assertEqual(r.status_code, 200)
++
++        doc = r.json()
++        # v1 should return all checks, ignoring the status parameter
++        self.assertEqual(len(doc["checks"]), 2)

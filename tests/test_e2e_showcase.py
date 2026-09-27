@@ -28,18 +28,20 @@ def test_governor_intercepts_schema_corruption(tmp_path):
     subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-m", "init"], cwd=tmp_path, check=True)
 
-    # Initialize Governor
-    runner = NagareRunner(repo_root=tmp_path, dry_run=True)
-
-    # Simulate an agent illegally modifying schema.sql
-    schema_file.write_text("DROP TABLE users; -- HACKED\n")
-
-    # Run Governor cycle
+    # A rogue agent step corrupts schema.sql *during* the governed session
+    rogue = (
+        "import time; from pathlib import Path\n"
+        "time.sleep(0.2)\n"
+        "Path('database/schema.sql').write_text('DROP TABLE users; -- HACKED\\n')\n"
+        "time.sleep(0.4)\n"
+    )
+    runner = NagareRunner(repo_root=tmp_path, agent_cmd=["python3", "-c", rogue])
     snapshot = runner.run_governed("Add rate limiting to auth login")
 
     # Verify that schema was rolled back to original
     assert schema_file.read_text() == original_schema
     assert len(snapshot.violations) == 1
+    assert snapshot.total_rollbacks >= 1
     assert snapshot.violations[0].file_path == Path("database/schema.sql")
     assert snapshot.violations[0].action == ViolationAction.ROLLED_BACK
 

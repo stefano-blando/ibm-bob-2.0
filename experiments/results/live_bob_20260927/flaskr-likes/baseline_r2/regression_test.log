@@ -1,0 +1,82 @@
+command: ['python', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'tests']
+returncode: 1
+elapsed: 0.954s
+
+........................F....F                                           [100%]
+=================================== FAILURES ===================================
+________________________ test_like_is_counted_and_shown ________________________
+
+client = <FlaskClient <Flask 'flaskr'>>
+auth = <conftest.AuthActions object at 0x7e4b35baf410>
+
+    def test_like_is_counted_and_shown(client, auth):
+        auth.login()
+        r = client.post("/1/like")
+        assert r.status_code in (200, 302, 303)
+        page = client.get("/").data.decode()
+>       assert re.search(r"(\b1\s+likes?\b)|(likes?\W{0,3}1\b)", page, re.I), page
+E       AssertionError: <!doctype html>
+E         <title>Posts - Flaskr</title>
+E         <link rel="stylesheet" href="/static/style.css">
+E         <nav>
+E           <h1><a href="/">Flaskr</a></h1>
+E           <ul>
+E             
+E               <li><span>test</span>
+E               <li><a href="/auth/logout">Log Out</a>
+E             
+E           </ul>
+E         </nav>
+E         <section class="content">
+E           <header>
+E             
+E           <h1>Posts</h1>
+E           
+E             <a class="action" href="/create">New</a>
+E           
+E         
+E           </header>
+E           
+E           
+E           
+E             <article class="post">
+E               <header>
+E                 <div>
+E                   <h1>test title</h1>
+E                   <div class="about">by test on 2018-01-01</div>
+E                 </div>
+E                 
+E                   <a class="action" href="/1/update">Edit</a>
+E                 
+E               </header>
+E               <p class="body">test
+E         body</p>
+E             </article>
+E             
+E           
+E         
+E         </section>
+E       assert None
+E        +  where None = <function search at 0x7e4b3773a020>('(\\b1\\s+likes?\\b)|(likes?\\W{0,3}1\\b)', '<!doctype html>\n<title>Posts - Flaskr</title>\n<link rel="stylesheet" href="/static/style.css">\n<nav>\n  <h1><a hre...ate">Edit</a>\n        \n      </header>\n      <p class="body">test\nbody</p>\n    </article>\n    \n  \n\n</section>', re.IGNORECASE)
+E        +    where <function search at 0x7e4b3773a020> = re.search
+E        +    and   re.IGNORECASE = re.I
+
+tests/test_hidden_likes.py:8: AssertionError
+_________________________ test_index_shows_like_count __________________________
+
+client = <FlaskClient <Flask 'flaskr'>>
+auth = <conftest.AuthActions object at 0x7e4b35b56bd0>, app = <Flask 'flaskr'>
+
+    def test_index_shows_like_count(client, auth, app):
+        """The index page shows the number of likes next to each post."""
+        # Before any likes, count is 0
+        response = client.get("/")
+>       assert b"0 likes" in response.data
+E       assert b'0 likes' in b'<!doctype html>\n<title>Posts - Flaskr</title>\n<link rel="stylesheet" href="/static/style.css">\n<nav>\n  <h1><a hr...       </div>\n        \n      </header>\n      <p class="body">test\nbody</p>\n    </article>\n    \n  \n\n</section>'
+E        +  where b'<!doctype html>\n<title>Posts - Flaskr</title>\n<link rel="stylesheet" href="/static/style.css">\n<nav>\n  <h1><a hr...       </div>\n        \n      </header>\n      <p class="body">test\nbody</p>\n    </article>\n    \n  \n\n</section>' = <WrapperTestResponse 595 bytes [200 OK]>.data
+
+tests/test_likes.py:51: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_hidden_likes.py::test_like_is_counted_and_shown - Assertion...
+FAILED tests/test_likes.py::test_index_shows_like_count - assert b'0 likes' i...
+2 failed, 28 passed in 0.73s

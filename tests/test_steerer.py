@@ -48,8 +48,12 @@ def test_micro_rollback_untracked_forbidden_file(tmp_path):
     assert unwanted.exists()
 
     event = steerer.revert_and_steer(Path("unwanted.txt"))
-    assert event.action == ViolationAction.ROLLED_BACK
+    # New files are quarantined, never deleted
+    assert event.action == ViolationAction.QUARANTINED
     assert not unwanted.exists()
+    quarantined = list((tmp_path / ".nagare" / "quarantine").rglob("unwanted.txt"))
+    assert len(quarantined) == 1
+    assert quarantined[0].read_text() == "rogue data\n"
 
 def test_micro_rollback_with_index_lock_contention(tmp_path):
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)

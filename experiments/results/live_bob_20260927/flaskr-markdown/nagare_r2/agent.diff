@@ -1,0 +1,48 @@
+diff --git a/flaskr/__init__.py b/flaskr/__init__.py
+index ab96e71..f7f3b26 100644
+--- a/flaskr/__init__.py
++++ b/flaskr/__init__.py
+@@ -27,6 +27,11 @@ def create_app(test_config=None):
+     def hello():
+         return "Hello, World!"
+ 
++    # register the markdown filter
++    from .markdown import render_markdown
++
++    app.jinja_env.filters["markdown"] = render_markdown
++
+     # register the database commands
+     from . import db
+ 
+diff --git a/flaskr/templates/blog/index.html b/flaskr/templates/blog/index.html
+index 3481b8e..ff92661 100644
+--- a/flaskr/templates/blog/index.html
++++ b/flaskr/templates/blog/index.html
+@@ -19,7 +19,7 @@
+           <a class="action" href="{{ url_for('blog.update', id=post['id']) }}">Edit</a>
+         {% endif %}
+       </header>
+-      <p class="body">{{ post['body'] }}</p>
++      <div class="body">{{ post['body'] | markdown }}</div>
+     </article>
+     {% if not loop.last %}
+       <hr>
+
+diff --git a/flaskr/markdown.py b/flaskr/markdown.py
+new file mode 100644
+--- /dev/null
++++ b/flaskr/markdown.py
++from markdown_it import MarkdownIt
++from markupsafe import Markup
++
++_md = MarkdownIt().disable("html_block").disable("html_inline")
++
++
++def render_markdown(text):
++    """Render *text* as Markdown HTML.
++
++    Raw HTML tags written by the author are escaped so they cannot inject
++    scripts or other malicious markup.  The returned value is marked safe
++    for Jinja2 so it can be output with ``| safe``.
++    """
++    return Markup(_md.render(text))

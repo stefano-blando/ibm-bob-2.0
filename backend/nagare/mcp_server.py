@@ -6,10 +6,14 @@ via standard stdio JSON-RPC 2.0.
 
 import sys
 import json
+import time
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
 from nagare.scope import ScopeSynthesizer
+from nagare.models import ScopeContract, ViolationAction, ViolationEvent
+from nagare.hooks import append_event
+from nagare.paths import CONTRACT_FILE, DIRECTIVE_FILE
 
 logging.basicConfig(level=logging.ERROR, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("nagare.mcp")
@@ -49,12 +53,18 @@ class NagareMCPServer:
         self.repo_root = Path(repo_root or Path.cwd()).resolve()
         self.synthesizer = ScopeSynthesizer(self.repo_root)
 
+    def active_contract(self, intent: Optional[str] = None) -> ScopeContract:
+        """The contract the governor is enforcing right now; falls back to synthesizing one."""
+        live = ScopeContract.load(self.repo_root / CONTRACT_FILE)
+        if live is not None:
+            return live
+        return self.synthesizer.synthesize_scope(intent or "Current Task")
+
     def handle_tool_call(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        directive_file = self.repo_root / ".nagare_directive.md"
+        directive_file = self.repo_root / DIRECTIVE_FILE
 
         if name == "nagare_get_scope":
-            intent = arguments.get("intent", "Current Task")
-            contract = self.synthesizer.synthesize_scope(intent)
+            contract = self.active_contract(arguments.get("intent"))
             
             permitted = sorted(str(p) for p in contract.permitted_paths)
             restricted = sorted(str(p) for p in contract.restricted_paths)
@@ -75,17 +85,28 @@ class NagareMCPServer:
             file_path_str = arguments.get("file_path", "")
             target_path = Path(file_path_str)
 
-            contract = self.synthesizer.synthesize_scope("General check")
-            is_permitted = target_path in contract.permitted_paths
-            is_restricted = target_path in contract.restricted_paths or any(
-                str(target_path).endswith(p.name) for p in contract.restricted_paths
-            )
+            contract = self.active_contract()
+            rel = target_path
+            if rel.is_absolute():
+                try:
+                    rel = rel.resolve().relative_to(self.repo_root)
+                except ValueError:
+                    pass
+            decision = contract.decide(rel, is_new=not (self.repo_root / rel).exists())
+            is_permitted = decision in (ViolationAction.ALLOWED, ViolationAction.WARNED)
+            is_restricted = not is_permitted
 
             if is_restricted or not is_permitted:
+                if (self.repo_root / CONTRACT_FILE).exists():
+                    append_event(self.repo_root, ViolationEvent(
+                        file_path=rel, action=ViolationAction.DENIED, timestamp=time.time(),
+                        steering_prompt=f"MCP advisory: '{rel.as_posix()}' is outside the active scope contract.",
+                        layer="mcp", detail="nagare_check_permission",
+                    ))
                 text = (
                     f"⛔ PERMISSION DENIED: Modification of '{file_path_str}' is STRICTLY PROHIBITED by Nagare Governor.\n"
                     f"Reason: This file is out-of-scope or contains critical infrastructure/schemas.\n"
-                    f"Any writes to this file will be automatically rolled back in sub-15ms.\n"
+                    f"Any writes to this file will be blocked or automatically reverted.\n"
                     f"Please implement your solution within permitted files."
                 )
             else:
@@ -110,7 +131,7 @@ class NagareMCPServer:
                 "result": {
                     "protocolVersion": "2024-11-05",
                     "capabilities": {"tools": {}},
-                    "serverInfo": {"name": "nagare-governor", "version": "0.2.0"}
+                    "serverInfo": {"name": "nagare-governor", "version": "0.3.0"}
                 }
             }
 

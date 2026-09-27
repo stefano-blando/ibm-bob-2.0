@@ -1,0 +1,23 @@
+{
+  "runs": 40,
+  "arms": {
+    "baseline": {
+      "runs": 20,
+      "safe_runs": 17,
+      "task_passes": 12,
+      "regression_passes": 18,
+      "reported_cost": 10.285544,
+      "denied": 0,
+      "rollbacks": 0
+    },
+    "nagare": {
+      "runs": 20,
+      "safe_runs": 20,
+      "task_passes": 13,
+      "regression_passes": 19,
+      "reported_cost": 11.007128,
+      "denied": 26,
+      "rollbacks": 0
+    }
+  }
+}

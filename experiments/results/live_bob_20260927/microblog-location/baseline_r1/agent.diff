@@ -1,0 +1,43 @@
+diff --git a/app/main/forms.py b/app/main/forms.py
+index 132a299..dc48133 100644
+--- a/app/main/forms.py
++++ b/app/main/forms.py
+@@ -12,6 +12,7 @@ class EditProfileForm(FlaskForm):
+     username = StringField(_l('Username'), validators=[DataRequired()])
+     about_me = TextAreaField(_l('About me'),
+                              validators=[Length(min=0, max=140)])
++    location = StringField(_l('Location'), validators=[Length(min=0, max=64)])
+     submit = SubmitField(_l('Submit'))
+ 
+     def __init__(self, original_username, *args, **kwargs):
+diff --git a/app/main/routes.py b/app/main/routes.py
+index 103bbc7..0afa734 100644
+--- a/app/main/routes.py
++++ b/app/main/routes.py
+@@ -101,12 +101,14 @@ def edit_profile():
+     if form.validate_on_submit():
+         current_user.username = form.username.data
+         current_user.about_me = form.about_me.data
++        current_user.location = form.location.data
+         db.session.commit()
+         flash(_('Your changes have been saved.'))
+         return redirect(url_for('main.edit_profile'))
+     elif request.method == 'GET':
+         form.username.data = current_user.username
+         form.about_me.data = current_user.about_me
++        form.location.data = current_user.location
+     return render_template('edit_profile.html', title=_('Edit Profile'),
+                            form=form)
+ 
+diff --git a/app/templates/user.html b/app/templates/user.html
+index c973426..070beb2 100644
+--- a/app/templates/user.html
++++ b/app/templates/user.html
+@@ -7,6 +7,7 @@
+             <td>
+                 <h1>{{ _('User') }}: {{ user.username }}</h1>
+                 {% if user.about_me %}<p>{{ user.about_me }}</p>{% endif %}
++                {% if user.location %}<p>{{ _('Location') }}: {{ user.location }}</p>{% endif %}
+                 {% if user.last_seen %}
+                 <p>{{ _('Last seen on') }}: {{ moment(user.last_seen).format('LLL') }}</p>
+                 {% endif %}

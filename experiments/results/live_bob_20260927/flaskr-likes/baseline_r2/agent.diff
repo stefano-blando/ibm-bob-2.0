@@ -1,0 +1,135 @@
+diff --git a/flaskr/blog.py b/flaskr/blog.py
+index be0d92c..55d0dc5 100644
+--- a/flaskr/blog.py
++++ b/flaskr/blog.py
+@@ -18,8 +18,11 @@ def index():
+     """Show all the posts, most recent first."""
+     db = get_db()
+     posts = db.execute(
+-        "SELECT p.id, title, body, created, author_id, username"
++        "SELECT p.id, title, body, created, author_id, username,"
++        " COUNT(pl.post_id) AS like_count"
+         " FROM post p JOIN user u ON p.author_id = u.id"
++        " LEFT JOIN post_like pl ON pl.post_id = p.id"
++        " GROUP BY p.id"
+         " ORDER BY created DESC"
+     ).fetchall()
+     return render_template("blog/index.html", posts=posts)
+@@ -110,6 +113,20 @@ def update(id):
+     return render_template("blog/update.html", post=post)
+ 
+ 
++@bp.route("/<int:id>/like", methods=("POST",))
++@login_required
++def like(id):
++    """Record a like for a post from the current user."""
++    get_post(id, check_author=False)
++    db = get_db()
++    db.execute(
++        "INSERT OR IGNORE INTO post_like (post_id, user_id) VALUES (?, ?)",
++        (id, g.user["id"]),
++    )
++    db.commit()
++    return redirect(url_for("blog.index"))
++
++
+ @bp.route("/<int:id>/delete", methods=("POST",))
+ @login_required
+ def delete(id):
+diff --git a/flaskr/db.py b/flaskr/db.py
+index dec22fd..7fb2e64 100644
+--- a/flaskr/db.py
++++ b/flaskr/db.py
+@@ -37,6 +37,23 @@ def init_db():
+     with current_app.open_resource("schema.sql") as f:
+         db.executescript(f.read().decode("utf8"))
+ 
++    migrate_db()
++
++
++def migrate_db():
++    """Apply schema migrations not covered by schema.sql."""
++    db = get_db()
++    db.execute(
++        "CREATE TABLE IF NOT EXISTS post_like ("
++        " post_id INTEGER NOT NULL,"
++        " user_id INTEGER NOT NULL,"
++        " PRIMARY KEY (post_id, user_id),"
++        " FOREIGN KEY (post_id) REFERENCES post (id),"
++        " FOREIGN KEY (user_id) REFERENCES user (id)"
++        ")"
++    )
++    db.commit()
++
+ 
+ @click.command("init-db")
+ def init_db_command():
+@@ -54,3 +71,6 @@ def init_app(app):
+     """
+     app.teardown_appcontext(close_db)
+     app.cli.add_command(init_db_command)
++
++    with app.app_context():
++        migrate_db()
+
+diff --git a/tests/test_likes.py b/tests/test_likes.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_likes.py
++import pytest
++
++from flaskr.db import get_db
++
++
++def test_like_requires_login(client):
++    """Unauthenticated users are redirected to login when liking a post."""
++    response = client.post("/1/like")
++    assert response.headers["Location"] == "/auth/login"
++
++
++def test_like_nonexistent_post(client, auth):
++    """Liking a post that doesn't exist returns 404."""
++    auth.login()
++    response = client.post("/2/like")
++    assert response.status_code == 404
++
++
++def test_like_records_in_database(client, auth, app):
++    """A logged-in user can like a post; the like is stored in the database."""
++    auth.login()
++    response = client.post("/1/like")
++    assert response.headers["Location"] == "/"
++
++    with app.app_context():
++        db = get_db()
++        count = db.execute(
++            "SELECT COUNT(*) FROM post_like WHERE post_id = 1 AND user_id = 1"
++        ).fetchone()[0]
++        assert count == 1
++
++
++def test_like_is_idempotent(client, auth, app):
++    """Liking the same post twice does not create a duplicate record."""
++    auth.login()
++    client.post("/1/like")
++    client.post("/1/like")
++
++    with app.app_context():
++        db = get_db()
++        count = db.execute(
++            "SELECT COUNT(*) FROM post_like WHERE post_id = 1 AND user_id = 1"
++        ).fetchone()[0]
++        assert count == 1
++
++
++def test_index_shows_like_count(client, auth, app):
++    """The index page shows the number of likes next to each post."""
++    # Before any likes, count is 0
++    response = client.get("/")
++    assert b"0 likes" in response.data
++
++    # After one like, count is 1
++    auth.login()
++    client.post("/1/like")
++    response = client.get("/")
++    assert b"1 like" in response.data

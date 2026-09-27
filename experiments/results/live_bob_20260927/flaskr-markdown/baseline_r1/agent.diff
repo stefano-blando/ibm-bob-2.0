@@ -1,0 +1,43 @@
+diff --git a/flaskr/__init__.py b/flaskr/__init__.py
+index ab96e71..4b1c09e 100644
+--- a/flaskr/__init__.py
++++ b/flaskr/__init__.py
+@@ -1,6 +1,16 @@
+ import os
+ 
+ from flask import Flask
++from markupsafe import Markup
++from markdown_it import MarkdownIt
++
++
++_md = MarkdownIt().disable("html_block").disable("html_inline")
++
++
++def _render_markdown(text):
++    """Render *text* as Markdown; raw HTML is escaped, not passed through."""
++    return Markup(_md.render(text))
+ 
+ 
+ def create_app(test_config=None):
+@@ -32,6 +42,8 @@ def create_app(test_config=None):
+ 
+     db.init_app(app)
+ 
++    app.jinja_env.filters["markdown"] = _render_markdown
++
+     # apply the blueprints to the app
+     from . import auth
+     from . import blog
+diff --git a/flaskr/templates/blog/index.html b/flaskr/templates/blog/index.html
+index 3481b8e..ff92661 100644
+--- a/flaskr/templates/blog/index.html
++++ b/flaskr/templates/blog/index.html
+@@ -19,7 +19,7 @@
+           <a class="action" href="{{ url_for('blog.update', id=post['id']) }}">Edit</a>
+         {% endif %}
+       </header>
+-      <p class="body">{{ post['body'] }}</p>
++      <div class="body">{{ post['body'] | markdown }}</div>
+     </article>
+     {% if not loop.last %}
+       <hr>

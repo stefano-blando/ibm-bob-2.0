@@ -7,16 +7,16 @@
 
 ## 🧭 The Vision: Universal Autonomous Guardrails
 
-While **Nagare Governor** was created as the premier in-flight supervisor for **IBM Bob 2.0**, its architectural foundation—**Linux kernel inotify file monitoring, lockless Git blob recovery, and dynamic AST manifold scoping**—is completely runtime-agnostic.
+Nagare's deepest integration is with **IBM Bob 2.0** (native SessionStart/PreToolUse/PostToolUse hooks + MCP). Its filesystem layer—**inotify monitoring, session-baseline restore, and task-derived scope contracts**—is agent-agnostic, so any agent can be governed at the filesystem level.
 
 By adhering to the open **Model Context Protocol (MCP)** standard and providing a flexible CLI wrapper, Nagare can govern **any AI coding agent** on the market today.
 
 ```
                          +-----------------------------------+
                          |         NAGARE GOVERNOR           |
-                         |   - Kernel Inotify (< 2ms)        |
-                         |   - Lockless Micro-Rollback (<15ms|
-                         |   - Dynamic AST Manifold Scoping  |
+                         |   - Bob hooks (deny pre-write)    |
+                         |   - inotify restore (~9ms median) |
+                         |   - Task-scoped write contract    |
                          +-----------------+-----------------+
                                            |
          +------------------+--------------+---------------+------------------+
@@ -61,9 +61,9 @@ claude mcp add nagare python3 -m nagare.mcp_server
 ### Supervised Execution
 Run Claude Code with Nagare's supervisor wrapping the process:
 ```bash
-nagare run "Refactor payment service" --agent-cmd "claude --dangerously-skip-permissions"
+nagare run "Refactor payment service" --agent-cmd "claude -p {prompt} --dangerously-skip-permissions"
 ```
-Even with `--dangerously-skip-permissions` enabled, Nagare's kernel inotify observer intercepts out-of-scope mutations in $< 2\text{ms}$ and restores clean HEAD state before the next LLM turn.
+Even with `--dangerously-skip-permissions` enabled, Nagare's filesystem layer restores out-of-scope writes to the session baseline (≈9 ms median in our benchmark). For non-Bob agents only the filesystem layer and MCP apply; the pre-write hook layer is Bob-specific.
 
 ---
 
@@ -110,7 +110,7 @@ extensions:
 Nagare exposes two standardized MCP tools adhering to the `2024-11-05` JSON-RPC specification:
 
 ### 1. `nagare_get_scope`
-- **Description**: Returns the active mathematical scope contract, including all permitted files (1-hop AST reachable) and strictly protected infrastructure files.
+- **Description**: Returns the scope contract the governor is currently enforcing, including all permitted files (1-hop AST reachable) and strictly protected infrastructure files.
 - **Parameters**: `intent` (optional string).
 - **Example Response**:
   ```text
@@ -130,7 +130,7 @@ Nagare exposes two standardized MCP tools adhering to the `2024-11-05` JSON-RPC 
 - **Parameters**: `file_path` (required string).
 - **Responses**:
   - `✅ PERMISSION GRANTED`: Safe to modify within the current task manifold.
-  - `⛔ PERMISSION DENIED`: Modification strictly prohibited. Writes will trigger an instant sub-15ms micro-rollback.
+  - `⛔ PERMISSION DENIED`: Modification strictly prohibited. Writes will be blocked (Bob hook) or reverted (filesystem layer).
 
 ---
 

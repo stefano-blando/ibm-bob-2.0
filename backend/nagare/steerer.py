@@ -2,131 +2,157 @@ import time
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, Set
 from nagare.models import ScopeContract, ViolationEvent, ViolationAction
+from nagare.baseline import Baseline
+from nagare.paths import QUARANTINE_DIR, DIRECTIVE_FILE
+
+
+def permitted_summary(contract: ScopeContract, limit: int = 12) -> str:
+    items = sorted(p.as_posix() for p in contract.permitted_paths)
+    if not items:
+        return "designated module"
+    shown = ", ".join(items[:limit])
+    return shown + (f" (+{len(items) - limit} more)" if len(items) > limit else "")
+
+
+def steering_message(rel: Path, action: ViolationAction, contract: ScopeContract, sensitive: bool) -> str:
+    reason = "protected infrastructure (schema/migrations/secrets/lockfile)" if sensitive else "outside the task's permitted scope"
+    what = {
+        ViolationAction.DENIED: "The write was blocked before it happened.",
+        ViolationAction.ROLLED_BACK: "The file was restored to its state at session start.",
+        ViolationAction.QUARANTINED: "The new file was moved to .nagare/quarantine (not deleted).",
+        ViolationAction.WARNED: "The change was kept but flagged for review.",
+    }.get(action, "")
+    return (
+        f"[NAGARE GOVERNOR] '{rel.as_posix()}' is {reason}. {what}\n"
+        f"Permitted files: {permitted_summary(contract)}\n"
+        f"Do not retry this file. Implement the task within the permitted files "
+        f"(new helper modules next to them or new tests are allowed)."
+    )
+
 
 class MicroSteerer:
-    def __init__(self, repo_root: Path, contract: ScopeContract, debounce_seconds: float = 0.15):
+    def __init__(
+        self,
+        repo_root: Path,
+        contract: ScopeContract,
+        debounce_seconds: float = 0.15,
+        baseline: Optional[Baseline] = None,
+        session_id: str = "adhoc",
+    ):
         self.repo_root = Path(repo_root).resolve()
         self.contract = contract
         self.debounce_seconds = debounce_seconds
+        self.baseline = baseline or Baseline.head_only(self.repo_root)
+        self.session_id = session_id
         self._last_revert: Dict[Path, float] = {}
+        self._warned: Dict[Path, bytes] = {}
+        self._intercepted: Set[Path] = set()
+        self._ignored_cache: Dict[Path, bool] = {}
 
     def is_dirty(self, rel: Path) -> bool:
-        full_path = self.repo_root / rel
-        if not full_path.exists():
-            return False
+        """True when the file differs from the session baseline (incl. deleted or newly created)."""
+        return self.baseline.differs(Path(rel))
 
-        # Check unstaged diff
-        diff_unstaged = subprocess.run(
-            ["git", "diff", "--quiet", "--", str(rel)],
-            cwd=self.repo_root
-        ).returncode != 0
-        if diff_unstaged:
-            return True
+    def handle_change(self, relative_path: Path) -> Optional[ViolationEvent]:
+        """Apply the contract policy to a file the agent touched. None = nothing to do."""
+        rel = Path(relative_path)
+        if not self.baseline.differs(rel):
+            return None
+        is_new = not self.baseline.existed_at_start(rel)
+        if is_new and self._is_gitignored(rel):
+            return None
+        decision = self.contract.decide(rel, is_new=is_new)
+        if decision == ViolationAction.ALLOWED:
+            return None
+        if decision == ViolationAction.WARNED:
+            full = self.repo_root / rel
+            current = full.read_bytes() if full.is_file() else b""
+            if self._warned.get(rel) == current:
+                return None
+            self._warned[rel] = current
+            return ViolationEvent(
+                file_path=rel,
+                action=ViolationAction.WARNED,
+                timestamp=time.time(),
+                steering_prompt=steering_message(rel, ViolationAction.WARNED, self.contract, False),
+            )
+        return self.revert_and_steer(rel)
 
-        # Check staged diff
-        diff_staged = subprocess.run(
-            ["git", "diff", "--cached", "--quiet", "--", str(rel)],
-            cwd=self.repo_root
-        ).returncode != 0
-        if diff_staged:
-            return True
-
-        # Check untracked
-        res_untracked = subprocess.run(
-            ["git", "ls-files", "--others", "--exclude-standard", str(rel)],
-            cwd=self.repo_root,
-            capture_output=True,
-            text=True
-        )
-        if res_untracked.stdout.strip():
-            return True
-
-        return False
+    def _is_gitignored(self, rel: Path) -> bool:
+        if rel not in self._ignored_cache:
+            res = subprocess.run(["git", "check-ignore", "-q", rel.as_posix()], cwd=self.repo_root, capture_output=True)
+            self._ignored_cache[rel] = res.returncode == 0
+        return self._ignored_cache[rel]
 
     def revert_and_steer(self, relative_path: Path) -> Optional[ViolationEvent]:
+        """Restore a file to the session baseline (or quarantine it if it is new)."""
         rel = Path(relative_path)
         full_path = self.repo_root / rel
 
-        # Debounce rapid duplicate events
         now = time.time()
-        if self.debounce_seconds > 0.0 and rel in self._last_revert and (now - self._last_revert[rel]) < self.debounce_seconds:
-            return None
+        # Debounce only de-duplicates *events*; the restore itself always runs, so a second write
+        # landing inside the window can never survive until the next reconciliation poll.
+        duplicate = (
+            self.debounce_seconds > 0.0 and rel in self._last_revert
+            and (now - self._last_revert[rel]) < self.debounce_seconds
+        )
 
-        # If file is not dirty, no rollback needed
-        if not self.is_dirty(rel):
+        known, expected = self.baseline.expected(rel)
+        if not known:
+            return None
+        current = full_path.read_bytes() if full_path.is_file() else None
+        if current == expected:
             return None
 
         self._last_revert[rel] = now
 
-        # Check if tracked in git
-        res = subprocess.run(
-            ["git", "ls-files", "--error-unmatch", str(rel)],
-            cwd=self.repo_root,
-            capture_output=True
-        )
-        tracked = (res.returncode == 0)
-
-        if tracked:
-            # 1. Lockless Git blob restore: reads directly from .git/objects without touching .git/index.lock
-            show_res = subprocess.run(
-                ["git", "show", f"HEAD:{rel}"],
-                cwd=self.repo_root,
-                capture_output=True
-            )
-            if show_res.returncode == 0:
-                full_path.parent.mkdir(parents=True, exist_ok=True)
-                full_path.write_bytes(show_res.stdout)
-
-            # 2. Attempt staging index reconciliation (non-fatal if index.lock is held concurrently)
-            for _ in range(5):
-                checkout_res = subprocess.run(
-                    ["git", "checkout", "HEAD", "--", str(rel)],
-                    cwd=self.repo_root,
-                    capture_output=True
+        if expected is not None:
+            # Lockless restore: write the baseline bytes directly, no .git/index.lock needed.
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            full_path.write_bytes(expected)
+            action = ViolationAction.ROLLED_BACK
+            if rel not in self.baseline.snapshot:
+                # Baseline is HEAD: also drop anything the agent staged. Non-fatal under index.lock contention.
+                subprocess.run(
+                    ["git", "checkout", "HEAD", "--", rel.as_posix()],
+                    cwd=self.repo_root, capture_output=True,
                 )
-                if checkout_res.returncode == 0:
-                    break
-                time.sleep(0.02)
         else:
+            action = ViolationAction.QUARANTINED
             if full_path.exists():
-                if full_path.is_dir():
-                    shutil.rmtree(full_path)
-                else:
-                    full_path.unlink()
+                target = self.repo_root / QUARANTINE_DIR / self.session_id / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.exists():
+                    target = target.with_name(f"{target.name}.{int(now * 1000)}")
+                shutil.move(str(full_path), str(target))
 
-        permitted_list = ", ".join(str(p) for p in sorted(self.contract.permitted_paths)) or "designated module"
-        prompt = (
-            f"[NAGARE GOVERNOR INTERCEPTION]\n"
-            f"Scope Violation Detected: Attempted modification of restricted file '{rel}'.\n"
-            f"Action: Instant micro-rollback applied. The file has been restored to clean HEAD state.\n"
-            f"Permitted Scope: {permitted_list}\n"
-            f"Directive: Implement the solution strictly within permitted files without modifying '{rel}'."
-        )
-
-        # Write authoritative directive file in repo root for autonomous agent consumption
-        try:
-            directive_file = self.repo_root / ".nagare_directive.md"
-            directive_file.write_text(
-                f"# ⚠️ NAGARE GOVERNOR STEERING DIRECTIVE\n\n"
-                f"> **Violation Intercepted at**: {now}\n"
-                f"> **Restricted Target**: `{rel}` (Rolled Back)\n\n"
-                f"### Active Scope Constraints\n"
-                f"- **Permitted Files**: {permitted_list}\n"
-                f"- **Restricted Files**: `{rel}`, database schemas, and global configs.\n\n"
-                f"### Mandatory Agent Directive\n"
-                f"The modification to `{rel}` was rolled back to pristine HEAD state by Nagare Governor.\n"
-                f"**DO NOT** attempt to edit `{rel}` again.\n"
-                f"Solve the user request exclusively by modifying the permitted files listed above.\n"
-            )
-        except Exception:
-            pass
+        if duplicate:
+            return None
+        self._intercepted.add(rel)
+        sensitive = self.contract.is_sensitive(rel)
+        prompt = steering_message(rel, action, self.contract, sensitive)
+        self._write_directive(now)
 
         return ViolationEvent(
             file_path=rel,
-            action=ViolationAction.ROLLED_BACK,
+            action=action,
             timestamp=now,
-            steering_prompt=prompt
+            steering_prompt=prompt,
         )
 
+    def _write_directive(self, now: float) -> None:
+        # In-repo directive for agents that read AGENTS.md rules; the hook channel is primary.
+        try:
+            blocked = "\n".join(f"- `{p.as_posix()}`" for p in sorted(self._intercepted))
+            (self.repo_root / DIRECTIVE_FILE).write_text(
+                f"# NAGARE GOVERNOR STEERING DIRECTIVE\n\n"
+                f"> Last intervention: {time.strftime('%H:%M:%S', time.localtime(now))}\n\n"
+                f"### Files you must not modify (already restored)\n{blocked}\n\n"
+                f"### Permitted files\n{permitted_summary(self.contract, limit=50)}\n\n"
+                f"Solve the user request exclusively by modifying the permitted files listed above.\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass

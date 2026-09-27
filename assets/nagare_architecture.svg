@@ -46,9 +46,9 @@
 
   <!-- Header Banner -->
   <text x="60" y="65" font-size="28" font-weight="800" fill="url(#headerGrad)" letter-spacing="1">🌊 NAGARE GOVERNOR</text>
-  <text x="390" y="64" font-size="14" font-weight="600" fill="#94a3b8">|  In-Flight Active Steering &amp; Micro-Rollback Engine for IBM Bob 2.0</text>
-  <rect x="1000" y="44" width="140" height="28" rx="14" fill="#06b6d4" fill-opacity="0.15" stroke="#06b6d4" stroke-width="1"/>
-  <text x="1070" y="62" font-size="11" font-weight="700" fill="#38bdf8" text-anchor="middle">SUB-15ms LATENCY</text>
+  <text x="390" y="64" font-size="14" font-weight="600" fill="#94a3b8">|  Task-Scoped Write Contracts for IBM Bob 2.0</text>
+  <rect x="980" y="44" width="180" height="28" rx="14" fill="#06b6d4" fill-opacity="0.15" stroke="#06b6d4" stroke-width="1"/>
+  <text x="1070" y="62" font-size="11" font-weight="700" fill="#38bdf8" text-anchor="middle">TWO-LAYER ENFORCEMENT</text>
 
   <!-- ==================== COLUMN 1: INTENT & SYNTHESIS ==================== -->
   <g transform="translate(60, 110)">
@@ -84,7 +84,7 @@
   </g>
 
   <!-- Arrow: Synth to Contract -->
-  <path d="M 215 340 L 215 365" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <path fill="none" d="M 215 340 L 215 365" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- ==================== COLUMN 2: EXECUTION & INOTIFY ==================== -->
   <g transform="translate(440, 110)">
@@ -98,7 +98,7 @@
     <text x="20" y="100" font-size="12" fill="#cbd5e1">Autonomous Auto-Mode Agent Loop:</text>
     <text x="30" y="122" font-size="11" fill="#94a3b8">• High-throughput tool calling</text>
     <text x="30" y="142" font-size="11" fill="#94a3b8">• In-flight filesystem disk writes</text>
-    <text x="30" y="162" font-size="11" fill="#94a3b8">• Granite / watsonx reasoning cycle</text>
+    <text x="30" y="162" font-size="11" fill="#94a3b8">• LLM reasoning cycle</text>
 
     <!-- Status badge -->
     <rect x="20" y="185" width="280" height="28" rx="6" fill="#3b82f6" fill-opacity="0.12" stroke="#3b82f6"/>
@@ -111,14 +111,14 @@
     <rect x="15" y="15" width="290" height="30" rx="6" fill="#10b981" fill-opacity="0.12"/>
     <text x="160" y="35" font-size="12" font-weight="700" fill="#34d399" text-anchor="middle">Linux Inotify &amp; Git Observer</text>
 
-    <text x="25" y="70" font-size="12" fill="#cbd5e1">Kernel Event Detection: <tspan fill="#34d399" font-weight="700">&lt; 2.0 ms</tspan></text>
+    <text x="25" y="70" font-size="12" fill="#cbd5e1">Write → restored: <tspan fill="#34d399" font-weight="700">~9 ms median</tspan></text>
     <text x="25" y="92" font-size="11" fill="#94a3b8">• Watchdog filesystem handler</text>
     <text x="25" y="112" font-size="11" fill="#94a3b8">• Non-blocking dirty file polling</text>
     <text x="25" y="132" font-size="11" fill="#94a3b8">• Match vs Active ScopeContract</text>
   </g>
 
   <!-- Arrow: Bob writes to Inotify -->
-  <path d="M 600 340 L 600 365" stroke="#10b981" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <path fill="none" d="M 600 340 L 600 365" stroke="#10b981" stroke-width="2" marker-end="url(#arrowGreen)"/>
 
   <!-- ==================== COLUMN 3: ACTIVE STEERING & TELEMETRY ==================== -->
   <g transform="translate(830, 110)">
@@ -130,12 +130,12 @@
 
     <text x="20" y="75" font-size="11" font-weight="700" fill="#f87171">OUT-OF-SCOPE INTERCEPTION:</text>
     <rect x="20" y="85" width="270" height="48" rx="6" fill="#ef4444" fill-opacity="0.1" stroke="#ef4444"/>
-    <text x="30" y="103" font-size="10" font-family="monospace" fill="#fca5a5">git checkout HEAD -- &lt;forbidden&gt;</text>
-    <text x="30" y="122" font-size="11" font-weight="700" fill="#ef4444">Latency: 6.47 ms - 7.11 ms</text>
+    <text x="30" y="103" font-size="10" font-family="monospace" fill="#fca5a5">restore to session baseline</text>
+    <text x="30" y="122" font-size="11" font-weight="700" fill="#ef4444">+ Bob PreToolUse deny (pre-write)</text>
 
     <text x="20" y="155" font-size="11" font-weight="700" fill="#fb923c">IN-FLIGHT STEERING DIRECTIVE:</text>
-    <text x="25" y="175" font-size="10" fill="#cbd5e1">• Reverts rogue mutation to pristine state</text>
-    <text x="25" y="195" font-size="10" fill="#cbd5e1">• Injects constraint prompt into agent loop</text>
+    <text x="25" y="175" font-size="10" fill="#cbd5e1">• Quarantines new files, never deletes</text>
+    <text x="25" y="195" font-size="10" fill="#cbd5e1">• Hooks feed the reason back into Bob</text>
     <text x="25" y="215" font-size="10" fill="#cbd5e1">• Zero agent crashes or manual aborts</text>
   </g>
 
@@ -153,44 +153,44 @@
 
   <!-- Cross-Connecting Arrows -->
   <!-- Contract to Inotify -->
-  <path d="M 370 445 L 435 445" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <path fill="none" d="M 370 445 L 435 445" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
   <text x="402" y="435" font-size="9" fill="#94a3b8" text-anchor="middle">Bounds</text>
 
   <!-- Inotify to Steerer (Violation detected) -->
-  <path d="M 760 420 L 795 420 L 795 240 L 825 240" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 2" marker-end="url(#arrowRed)"/>
-  <text x="795" y="325" font-size="9" font-weight="700" fill="#ef4444" transform="rotate(-90 795 325)" text-anchor="middle">Violation Alert (&lt;2ms)</text>
+  <path fill="none" d="M 760 420 L 795 420 L 795 240 L 825 240" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 2" marker-end="url(#arrowRed)"/>
+  <text x="795" y="325" font-size="9" font-weight="700" fill="#ef4444" transform="rotate(-90 795 325)" text-anchor="middle">Violation Alert</text>
 
   <!-- Steerer to Bob (Micro-Rollback & Active Steering) -->
-  <path d="M 830 180 L 765 180" stroke="#f97316" stroke-width="2" marker-end="url(#arrow)"/>
+  <path fill="none" d="M 830 180 L 765 180" stroke="#f97316" stroke-width="2" marker-end="url(#arrow)"/>
   <text x="798" y="170" font-size="9" font-weight="700" fill="#f97316" text-anchor="middle">Steer</text>
 
   <!-- Steerer to Flight Recorder -->
-  <path d="M 985 340 L 985 365" stroke="#8b5cf6" stroke-width="2" marker-end="url(#arrow)"/>
+  <path fill="none" d="M 985 340 L 985 365" stroke="#8b5cf6" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- ==================== FOOTER METRICS BAR ==================== -->
   <g transform="translate(60, 545)">
     <rect x="0" y="0" width="1080" height="90" rx="10" fill="#0f172a" stroke="#1e293b"/>
     
     <g transform="translate(40, 20)">
-      <text x="0" y="18" font-size="11" font-weight="600" fill="#94a3b8">ROLLBACK SPEED</text>
-      <text x="0" y="48" font-size="24" font-weight="800" fill="#38bdf8">6.7 ms</text>
-      <text x="80" y="48" font-size="11" fill="#64748b">mean latency</text>
+      <text x="0" y="18" font-size="11" font-weight="600" fill="#94a3b8">WRITE → RESTORED</text>
+      <text x="0" y="48" font-size="24" font-weight="800" fill="#38bdf8">~9 ms</text>
+      <text x="80" y="48" font-size="11" fill="#64748b">median, 120/120</text>
     </g>
 
     <line x1="280" y1="15" x2="280" y2="75" stroke="#1e293b"/>
 
     <g transform="translate(320, 20)">
-      <text x="0" y="18" font-size="11" font-weight="600" fill="#94a3b8">P99 LATENCY</text>
-      <text x="0" y="48" font-size="24" font-weight="800" fill="#f59e0b">&lt; 9.5 ms</text>
-      <text x="95" y="48" font-size="11" fill="#64748b">predictable ceiling</text>
+      <text x="0" y="18" font-size="11" font-weight="600" fill="#94a3b8">HOOK DENY</text>
+      <text x="0" y="48" font-size="24" font-weight="800" fill="#f59e0b">38 ms</text>
+      <text x="95" y="48" font-size="11" fill="#64748b">median, pre-write</text>
     </g>
 
     <line x1="560" y1="15" x2="560" y2="75" stroke="#1e293b"/>
 
     <g transform="translate(600, 20)">
-      <text x="0" y="18" font-size="11" font-weight="600" fill="#94a3b8">INTEGRITY SUCCESS</text>
-      <text x="0" y="48" font-size="24" font-weight="800" fill="#10b981">100.0%</text>
-      <text x="95" y="48" font-size="11" fill="#64748b">200/200 protected</text>
+      <text x="0" y="18" font-size="11" font-weight="600" fill="#94a3b8">LIVE BOB A/B</text>
+      <text x="0" y="48" font-size="24" font-weight="800" fill="#10b981">4/4</text>
+      <text x="95" y="48" font-size="11" fill="#64748b">governed: schema intact</text>
     </g>
 
     <line x1="840" y1="15" x2="840" y2="75" stroke="#1e293b"/>

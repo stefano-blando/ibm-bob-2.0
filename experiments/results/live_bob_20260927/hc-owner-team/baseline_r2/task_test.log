@@ -1,0 +1,20 @@
+command: ['python', 'manage.py', 'test', '-v', '0', 'hc.api.tests.test_hidden_owner_team']
+returncode: 1
+elapsed: 1.812s
+
+System check identified no issues (0 silenced).
+/tmp/nagare-exp/venv_hc/lib/python3.12/site-packages/django/core/handlers/base.py:63: UserWarning: No directory at: /tmp/nagare_live_eval_work/hc-owner-team/baseline_r2/static-collected/
+  mw_instance = middleware(adapted_handler)
+======================================================================
+ERROR: test_owner_team_round_trips_through_v3_api (hc.api.tests.test_hidden_owner_team.HiddenOwnerTeamTestCase.test_owner_team_round_trips_through_v3_api)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nagare_live_eval_work/hc-owner-team/baseline_r2/hc/api/tests/test_hidden_owner_team.py", line 12, in test_owner_team_round_trips_through_v3_api
+    self.assertEqual(created.json()["owner_team"], "platform")
+                     ~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+KeyError: 'owner_team'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.006s
+
+FAILED (errors=1)

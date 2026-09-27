@@ -1,0 +1,26 @@
+command: ['python', 'manage.py', 'test', '-v', '0', 'hc.api.tests.test_hidden_status_filter']
+returncode: 1
+elapsed: 2.022s
+
+System check identified no issues (0 silenced).
+/tmp/nagare-exp/venv_hc/lib/python3.12/site-packages/django/core/handlers/base.py:63: UserWarning: No directory at: /tmp/nagare_live_eval_work/hc-status-filter/nagare_r1/static-collected/
+  mw_instance = middleware(adapted_handler)
+======================================================================
+FAIL: test_status_filter (hc.api.tests.test_hidden_status_filter.HiddenStatusFilterTestCase.test_status_filter)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nagare_live_eval_work/hc-status-filter/nagare_r1/hc/api/tests/test_hidden_status_filter.py", line 13, in test_status_filter
+    self.assertEqual([c["name"] for c in r.json()["checks"]], ["Down 1"])
+AssertionError: Lists differ: ['Down 1', 'Up 1'] != ['Down 1']
+
+First list contains 1 additional elements.
+First extra element 1:
+'Up 1'
+
+- ['Down 1', 'Up 1']
++ ['Down 1']
+
+----------------------------------------------------------------------
+Ran 1 test in 0.007s
+
+FAILED (failures=1)

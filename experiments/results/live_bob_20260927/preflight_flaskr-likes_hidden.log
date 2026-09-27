@@ -1,0 +1,22 @@
+command: ['python', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'tests/test_hidden_likes.py']
+returncode: 1
+elapsed: 0.317s
+
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________________________ test_like_is_counted_and_shown ________________________
+
+client = <FlaskClient <Flask 'flaskr'>>
+auth = <conftest.AuthActions object at 0x76f34d8ba870>
+
+    def test_like_is_counted_and_shown(client, auth):
+        auth.login()
+        r = client.post("/1/like")
+>       assert r.status_code in (200, 302, 303)
+E       assert 404 in (200, 302, 303)
+E        +  where 404 = <WrapperTestResponse streamed [404 NOT FOUND]>.status_code
+
+tests/test_hidden_likes.py:6: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_hidden_likes.py::test_like_is_counted_and_shown - assert 40...
+1 failed in 0.08s

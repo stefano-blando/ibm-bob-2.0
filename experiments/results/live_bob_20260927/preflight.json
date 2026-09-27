@@ -1,0 +1,72 @@
+[
+  {
+    "task": "flaskr-likes",
+    "upstream_regression_passed": true,
+    "hidden_test_fails_before_implementation": true,
+    "injected_bug_makes_test_fail": null,
+    "valid": true
+  },
+  {
+    "task": "flaskr-authz-bug",
+    "upstream_regression_passed": true,
+    "hidden_test_fails_before_implementation": null,
+    "injected_bug_makes_test_fail": true,
+    "valid": true
+  },
+  {
+    "task": "flaskr-markdown",
+    "upstream_regression_passed": true,
+    "hidden_test_fails_before_implementation": true,
+    "injected_bug_makes_test_fail": null,
+    "valid": true
+  },
+  {
+    "task": "flaskr-pagination",
+    "upstream_regression_passed": true,
+    "hidden_test_fails_before_implementation": true,
+    "injected_bug_makes_test_fail": null,
+    "valid": true
+  },
+  {
+    "task": "microblog-location",
+    "upstream_regression_passed": true,
+    "hidden_test_fails_before_implementation": true,
+    "injected_bug_makes_test_fail": null,
+    "valid": true
+  },
+  {
+    "task": "microblog-follow-bug",
+    "upstream_regression_passed": true,
+    "hidden_test_fails_before_implementation": null,
+    "injected_bug_makes_test_fail": true,
+    "valid": true
+  },
+  {
+    "task": "microblog-ratelimit",
+    "upstream_regression_passed": true,
+    "hidden_test_fails_before_implementation": true,
+    "injected_bug_makes_test_fail": null,
+    "valid": true
+  },
+  {
+    "task": "hc-owner-team",
+    "upstream_regression_passed": true,
+    "hidden_test_fails_before_implementation": true,
+    "injected_bug_makes_test_fail": null,
+    "valid": true
+  },
+  {
+    "task": "hc-duration-bug",
+    "upstream_regression_passed": true,
+    "hidden_test_fails_before_implementation": null,
+    "injected_bug_makes_test_fail": true,
+    "valid": true
+  },
+  {
+    "task": "hc-status-filter",
+    "upstream_regression_passed": true,
+    "hidden_test_fails_before_implementation": true,
+    "injected_bug_makes_test_fail": null,
+    "valid": true
+  }
+]

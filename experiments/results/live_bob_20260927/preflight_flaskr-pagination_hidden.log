@@ -1,0 +1,31 @@
+command: ['python', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'tests/test_hidden_pagination.py']
+returncode: 1
+elapsed: 0.305s
+
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________________ test_pages_of_five_newest_first ________________________
+
+app = <Flask 'flaskr'>, client = <FlaskClient <Flask 'flaskr'>>
+
+    def test_pages_of_five_newest_first(app, client):
+        _seed(app)
+        p1 = client.get("/").data.decode()
+        p2 = client.get("/?page=2").data.decode()
+        p3 = client.get("/?page=3").data.decode()
+>       assert _titles(p1) == {f"pagepost{i:02d}" for i in range(7, 12)}
+E       AssertionError: assert {'pagepost01'...epost06', ...} == {'pagepost07'... 'pagepost11'}
+E         
+E         Extra items in the left set:
+E         'pagepost02'
+E         'pagepost01'
+E         'pagepost04'
+E         'pagepost06'
+E         'pagepost03'
+E         'pagepost05'
+E         Use -v to get more diff
+
+tests/test_hidden_pagination.py:21: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_hidden_pagination.py::test_pages_of_five_newest_first - Ass...
+1 failed in 0.08s

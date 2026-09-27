@@ -1,0 +1,74 @@
+command: ['python', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'tests/test_hidden_likes.py']
+returncode: 1
+elapsed: 0.353s
+
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________________________ test_like_is_counted_and_shown ________________________
+
+client = <FlaskClient <Flask 'flaskr'>>
+auth = <conftest.AuthActions object at 0x71741a172ae0>
+
+    def test_like_is_counted_and_shown(client, auth):
+        auth.login()
+>       r = client.post("/1/like")
+            ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_hidden_likes.py:5: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/werkzeug/test.py:1167: in post
+    return self.open(*args, **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/flask/testing.py:235: in open
+    response = super().open(
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/werkzeug/test.py:1116: in open
+    response_parts = self.run_wsgi_app(request.environ, buffered=buffered)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/werkzeug/test.py:988: in run_wsgi_app
+    rv = run_wsgi_app(self.application, environ, buffered=buffered)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/werkzeug/test.py:1264: in run_wsgi_app
+    app_rv = app(environ, start_response)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/flask/app.py:1536: in __call__
+    return self.wsgi_app(environ, start_response)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/flask/app.py:1514: in wsgi_app
+    response = self.handle_exception(e)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/flask/app.py:1511: in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/flask/app.py:919: in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/flask/app.py:917: in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+/tmp/nagare-exp/venv_flask/lib/python3.12/site-packages/flask/app.py:902: in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+flaskr/auth.py:27: in wrapped_view
+    return view(**kwargs)
+           ^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+id = 1
+
+    @bp.route("/<int:id>/like", methods=("POST",))
+    @login_required
+    def like(id):
+        """Toggle a like on a post for the current user."""
+        # Verify the post exists (no author check needed).
+        get_post(id, check_author=False)
+        db = get_db()
+>       existing = db.execute(
+            "SELECT 1 FROM post_like WHERE user_id = ? AND post_id = ?",
+            (g.user["id"], id),
+        ).fetchone()
+E       sqlite3.OperationalError: no such table: post_like
+
+flaskr/blog.py:123: OperationalError
+=========================== short test summary info ============================
+FAILED tests/test_hidden_likes.py::test_like_is_counted_and_shown - sqlite3.O...
+1 failed in 0.09s

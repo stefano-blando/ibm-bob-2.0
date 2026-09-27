@@ -1,0 +1,56 @@
+command: ['python', 'manage.py', 'test', '-v', '0', 'hc.lib.tests.test_date']
+returncode: 1
+elapsed: 0.473s
+
+System check identified no issues (0 silenced).
+======================================================================
+FAIL: test_days_work (hc.lib.tests.test_date.ApproxFormattingTestCase.test_days_work)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nagare_live_eval_work/preflight/hc-duration-bug/injected/hc/lib/tests/test_date.py", line 51, in test_days_work
+    self.assertEqual(s, "3 days 6 h")
+AssertionError: '1 day 6 h' != '3 days 6 h'
+- 1 day 6 h
+? ^
++ 3 days 6 h
+? ^    +
+
+
+======================================================================
+FAIL: test_hours_work (hc.lib.tests.test_date.ApproxFormattingTestCase.test_hours_work)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nagare_live_eval_work/preflight/hc-duration-bug/injected/hc/lib/tests/test_date.py", line 59, in test_hours_work
+    self.assertEqual(s, "6 h 12 min")
+AssertionError: '1 day 6 h' != '6 h 12 min'
+- 1 day 6 h
++ 6 h 12 min
+
+
+======================================================================
+FAIL: test_minutes_work (hc.lib.tests.test_date.ApproxFormattingTestCase.test_minutes_work)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nagare_live_eval_work/preflight/hc-duration-bug/injected/hc/lib/tests/test_date.py", line 63, in test_minutes_work
+    self.assertEqual(s, "12 min 24 sec")
+AssertionError: '1 day 0 h' != '12 min 24 sec'
+- 1 day 0 h
++ 12 min 24 sec
+
+
+======================================================================
+FAIL: test_one_day_works (hc.lib.tests.test_date.ApproxFormattingTestCase.test_one_day_works)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nagare_live_eval_work/preflight/hc-duration-bug/injected/hc/lib/tests/test_date.py", line 55, in test_one_day_works
+    self.assertEqual(s, "1 day 6 h")
+AssertionError: '1 days 6 h' != '1 day 6 h'
+- 1 days 6 h
+?      -
++ 1 day 6 h
+
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.001s
+
+FAILED (failures=4)

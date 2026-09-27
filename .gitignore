@@ -31,3 +31,6 @@ Thumbs.db
 # Nagare Runtime
 .nagare_directive.md
 .bob/
+
+# Nagare session state (contract, events, quarantine)
+.nagare/

@@ -1,0 +1,67 @@
+diff --git a/app/auth/routes.py b/app/auth/routes.py
+index 79360ff..dcaf914 100644
+--- a/app/auth/routes.py
++++ b/app/auth/routes.py
+@@ -1,4 +1,6 @@
+-from flask import render_template, redirect, url_for, flash, request
++import time
++from collections import deque
++from flask import render_template, redirect, url_for, flash, request, abort
+ from urllib.parse import urlsplit
+ from flask_login import login_user, logout_user, current_user
+ from flask_babel import _
+@@ -10,16 +12,54 @@ from app.auth.forms import LoginForm, RegistrationForm, \
+ from app.models import User
+ from app.auth.email import send_password_reset_email
+ 
++_RATE_LIMIT_ATTEMPTS = 5
++_RATE_LIMIT_WINDOW = 60  # seconds
++
++# Maps IP -> deque of failure timestamps within the current window
++_failed_attempts: dict = {}
++
++
++def _is_rate_limited(ip: str) -> bool:
++    """Return True if *ip* has exceeded the failed-login rate limit."""
++    now = time.time()
++    window_start = now - _RATE_LIMIT_WINDOW
++    attempts = _failed_attempts.get(ip)
++    if attempts is None:
++        return False
++    # Evict timestamps outside the window
++    while attempts and attempts[0] <= window_start:
++        attempts.popleft()
++    return len(attempts) >= _RATE_LIMIT_ATTEMPTS
++
++
++def _record_failure(ip: str) -> None:
++    """Record a failed login attempt for *ip*."""
++    now = time.time()
++    window_start = now - _RATE_LIMIT_WINDOW
++    if ip not in _failed_attempts:
++        _failed_attempts[ip] = deque()
++    attempts = _failed_attempts[ip]
++    # Evict stale timestamps before appending
++    while attempts and attempts[0] <= window_start:
++        attempts.popleft()
++    attempts.append(now)
++
+ 
+ @bp.route('/login', methods=['GET', 'POST'])
+ def login():
+     if current_user.is_authenticated:
+         return redirect(url_for('main.index'))
++    ip = request.remote_addr
++    if _is_rate_limited(ip):
++        abort(429)
+     form = LoginForm()
+     if form.validate_on_submit():
+         user = db.session.scalar(
+             sa.select(User).where(User.username == form.username.data))
+         if user is None or not user.check_password(form.password.data):
++            _record_failure(ip)
++            if _is_rate_limited(ip):
++                abort(429)
+             flash(_('Invalid username or password'))
+             return redirect(url_for('auth.login'))
+         login_user(user, remember=form.remember_me.data)

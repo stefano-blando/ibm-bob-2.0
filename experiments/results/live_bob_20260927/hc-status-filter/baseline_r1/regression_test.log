@@ -1,0 +1,11 @@
+command: ['python', 'manage.py', 'test', '-v', '0', 'hc.api.tests.test_list_checks']
+returncode: 0
+elapsed: 2.063s
+
+System check identified no issues (0 silenced).
+/tmp/nagare-exp/venv_hc/lib/python3.12/site-packages/django/core/handlers/base.py:63: UserWarning: No directory at: /tmp/nagare_live_eval_work/hc-status-filter/baseline_r1/static-collected/
+  mw_instance = middleware(adapted_handler)
+----------------------------------------------------------------------
+Ran 11 tests in 0.043s
+
+OK

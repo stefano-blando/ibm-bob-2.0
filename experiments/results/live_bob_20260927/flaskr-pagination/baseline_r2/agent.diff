@@ -1,0 +1,57 @@
+diff --git a/flaskr/blog.py b/flaskr/blog.py
+index be0d92c..8e7b550 100644
+--- a/flaskr/blog.py
++++ b/flaskr/blog.py
+@@ -13,16 +13,33 @@ from .db import get_db
+ bp = Blueprint("blog", __name__)
+ 
+ 
++PER_PAGE = 5
++
++
+ @bp.route("/")
+ def index():
+-    """Show all the posts, most recent first."""
++    """Show all the posts, most recent first, paginated."""
+     db = get_db()
++    page = request.args.get("page", 1, type=int)
++    if page < 1:
++        page = 1
++    total = db.execute("SELECT COUNT(id) FROM post").fetchone()[0]
+     posts = db.execute(
+         "SELECT p.id, title, body, created, author_id, username"
+         " FROM post p JOIN user u ON p.author_id = u.id"
+         " ORDER BY created DESC"
++        " LIMIT ? OFFSET ?",
++        (PER_PAGE, (page - 1) * PER_PAGE),
+     ).fetchall()
+-    return render_template("blog/index.html", posts=posts)
++    has_prev = page > 1
++    has_next = page * PER_PAGE < total
++    return render_template(
++        "blog/index.html",
++        posts=posts,
++        page=page,
++        has_prev=has_prev,
++        has_next=has_next,
++    )
+ 
+ 
+ def get_post(id, check_author=True):
+diff --git a/flaskr/templates/blog/index.html b/flaskr/templates/blog/index.html
+index 3481b8e..be4d4c0 100644
+--- a/flaskr/templates/blog/index.html
++++ b/flaskr/templates/blog/index.html
+@@ -25,4 +25,12 @@
+       <hr>
+     {% endif %}
+   {% endfor %}
++  <nav class="pagination">
++    {% if has_prev %}
++      <a href="{{ url_for('blog.index', page=page - 1) }}">Previous</a>
++    {% endif %}
++    {% if has_next %}
++      <a href="{{ url_for('blog.index', page=page + 1) }}">Next</a>
++    {% endif %}
++  </nav>
+ {% endblock %}

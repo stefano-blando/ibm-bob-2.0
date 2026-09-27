@@ -1,0 +1,128 @@
+diff --git a/demo_app/api/routes/auth.py b/demo_app/api/routes/auth.py
+index 3ffabf5..581ba63 100644
+--- a/demo_app/api/routes/auth.py
++++ b/demo_app/api/routes/auth.py
+@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
+ from typing import Any
+ 
+ import demo_app.core.config as _config
+-from demo_app.services.user_service import verify_user
++from demo_app.services.user_service import check_rate_limit, verify_user
+ 
+ # Maximum consecutive failed attempts before the account is temporarily locked.
+ MAX_FAILED_ATTEMPTS = 5
+@@ -74,7 +74,7 @@ def _clear_failures(email: str) -> None:
+         conn.commit()
+ 
+ 
+-def login_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
++def login_endpoint(payload: dict[str, Any], client_ip: str = "127.0.0.1") -> dict[str, Any]:
+     """Authenticate a user and return a session token.
+ 
+     Args:
+@@ -82,12 +82,19 @@ def login_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
+             Expected keys:
+                 - ``email`` (str): The user's email address.
+                 - ``password`` (str): The user's plain-text password.
++        client_ip: The caller's IP address used as the token-bucket key.
++            Defaults to ``"127.0.0.1"`` for backwards compatibility.
+ 
+     Returns:
+-        On success:      ``{"token": str, "status": 200}``
+-        On locked:       ``{"error": str, "status": 429}``
+-        On bad creds:    ``{"error": str, "status": 401}``
++        On success:           ``{"token": str, "status": 200}``
++        On rate-limit (IP):   ``{"error": str, "status": 429}``
++        On account lock:      ``{"error": str, "status": 429}``
++        On bad creds:         ``{"error": str, "status": 401}``
+     """
++    # --- Token-bucket guard (per-IP) -------------------------------------------
++    if not check_rate_limit(client_ip):
++        return {"error": "Too many requests — please slow down", "status": 429}
++
+     email: str = payload.get("email", "")
+     password: str = payload.get("password", "")
+ 
+diff --git a/demo_app/services/user_service.py b/demo_app/services/user_service.py
+index 4d690f1..de5454a 100644
+--- a/demo_app/services/user_service.py
++++ b/demo_app/services/user_service.py
+@@ -2,6 +2,7 @@
+ # PERMITTED: Business logic layer
+ 
+ import re
++import threading
+ from datetime import datetime, timedelta, timezone
+ from typing import Optional, Dict, Any
+ 
+@@ -82,6 +83,70 @@ def clear_failed_attempts(email: str) -> None:
+     _LOCKOUT_TRACKER.pop(email, None)
+ 
+ 
++# ---------------------------------------------------------------------------
++# Token-bucket rate limiter (per-IP, in-memory)
++# ---------------------------------------------------------------------------
++
++# Each IP gets a bucket that refills at BUCKET_REFILL_RATE tokens/second and
++# holds at most BUCKET_CAPACITY tokens.  One token is consumed per request.
++# When a bucket is empty the request is rejected with a 429.
++
++BUCKET_CAPACITY: int = 10          # max burst
++BUCKET_REFILL_RATE: float = 1.0    # tokens restored per second
++
++
++class _TokenBucket:
++    """Thread-safe token-bucket for a single identity (e.g. a client IP)."""
++
++    __slots__ = ("_capacity", "_rate", "_tokens", "_last_refill", "_lock")
++
++    def __init__(self, capacity: int, rate: float) -> None:
++        self._capacity = capacity
++        self._rate = rate
++        self._tokens: float = float(capacity)
++        self._last_refill: datetime = datetime.now(timezone.utc)
++        self._lock = threading.Lock()
++
++    def consume(self) -> bool:
++        """Attempt to consume one token.
++
++        Returns:
++            True if the token was consumed (request allowed).
++            False if the bucket is empty (request should be rate-limited).
++        """
++        with self._lock:
++            self._refill()
++            if self._tokens >= 1.0:
++                self._tokens -= 1.0
++                return True
++            return False
++
++    def _refill(self) -> None:
++        now = datetime.now(timezone.utc)
++        elapsed = (now - self._last_refill).total_seconds()
++        self._tokens = min(self._capacity, self._tokens + elapsed * self._rate)
++        self._last_refill = now
++
++
++# Global registry: { identifier: _TokenBucket }
++# Protected by a module-level lock only for bucket *creation*; each bucket
++# uses its own internal lock for token operations.
++_BUCKET_REGISTRY: Dict[str, _TokenBucket] = {}
++_REGISTRY_LOCK = threading.Lock()
++
++
++def check_rate_limit(identifier: str) -> bool:
++    """Return True if the *identifier* is within its rate limit.
++
++    A new bucket (full) is created on first access.  Pass the client IP (or
++    any opaque key) as *identifier*.
++    """
++    with _REGISTRY_LOCK:
++        if identifier not in _BUCKET_REGISTRY:
++            _BUCKET_REGISTRY[identifier] = _TokenBucket(BUCKET_CAPACITY, BUCKET_REFILL_RATE)
++    return _BUCKET_REGISTRY[identifier].consume()
++
++
+ # ---------------------------------------------------------------------------
+ # User verification
+ # ---------------------------------------------------------------------------

@@ -1,0 +1,35 @@
+command: ['python', 'manage.py', 'test', '-v', '0', 'hc.api.tests.test_list_checks']
+returncode: 1
+elapsed: 1.768s
+
+System check identified no issues (0 silenced).
+/tmp/nagare-exp/venv_hc/lib/python3.12/site-packages/django/core/handlers/base.py:63: UserWarning: No directory at: /tmp/nagare_live_eval_work/hc-status-filter/baseline_r2/static-collected/
+  mw_instance = middleware(adapted_handler)
+======================================================================
+FAIL: test_v3_filters_by_status (hc.api.tests.test_list_checks.ListChecksTestCase.test_v3_filters_by_status)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nagare_live_eval_work/hc-status-filter/baseline_r2/hc/api/tests/test_list_checks.py", line 200, in test_v3_filters_by_status
+    self.assertEqual(len(doc["checks"]), 1)
+AssertionError: 2 != 1
+
+======================================================================
+FAIL: test_v3_filters_by_status_returns_empty (hc.api.tests.test_list_checks.ListChecksTestCase.test_v3_filters_by_status_returns_empty)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nagare_live_eval_work/hc-status-filter/baseline_r2/hc/api/tests/test_list_checks.py", line 208, in test_v3_filters_by_status_returns_empty
+    self.assertEqual(len(doc["checks"]), 0)
+AssertionError: 2 != 0
+
+======================================================================
+FAIL: test_v3_rejects_invalid_status (hc.api.tests.test_list_checks.ListChecksTestCase.test_v3_rejects_invalid_status)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nagare_live_eval_work/hc-status-filter/baseline_r2/hc/api/tests/test_list_checks.py", line 212, in test_v3_rejects_invalid_status
+    self.assertEqual(r.status_code, 400)
+AssertionError: 200 != 400
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.051s
+
+FAILED (failures=3)

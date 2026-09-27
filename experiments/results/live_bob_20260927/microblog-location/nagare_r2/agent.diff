@@ -1,0 +1,12 @@
+diff --git a/app/main/forms.py b/app/main/forms.py
+index 132a299..dc48133 100644
+--- a/app/main/forms.py
++++ b/app/main/forms.py
+@@ -12,6 +12,7 @@ class EditProfileForm(FlaskForm):
+     username = StringField(_l('Username'), validators=[DataRequired()])
+     about_me = TextAreaField(_l('About me'),
+                              validators=[Length(min=0, max=140)])
++    location = StringField(_l('Location'), validators=[Length(min=0, max=64)])
+     submit = SubmitField(_l('Submit'))
+ 
+     def __init__(self, original_username, *args, **kwargs):

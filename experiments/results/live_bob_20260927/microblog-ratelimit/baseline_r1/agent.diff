@@ -1,0 +1,83 @@
+diff --git a/app/auth/routes.py b/app/auth/routes.py
+index 79360ff..4bb25a0 100644
+--- a/app/auth/routes.py
++++ b/app/auth/routes.py
+@@ -1,4 +1,4 @@
+-from flask import render_template, redirect, url_for, flash, request
++from flask import render_template, redirect, url_for, flash, request, abort
+ from urllib.parse import urlsplit
+ from flask_login import login_user, logout_user, current_user
+ from flask_babel import _
+@@ -9,17 +9,22 @@ from app.auth.forms import LoginForm, RegistrationForm, \
+     ResetPasswordRequestForm, ResetPasswordForm
+ from app.models import User
+ from app.auth.email import send_password_reset_email
++from app.auth.limiter import is_rate_limited, record_failed_attempt
+ 
+ 
+ @bp.route('/login', methods=['GET', 'POST'])
+ def login():
+     if current_user.is_authenticated:
+         return redirect(url_for('main.index'))
++    ip = request.remote_addr
++    if request.method == 'POST' and is_rate_limited(ip):
++        abort(429)
+     form = LoginForm()
+     if form.validate_on_submit():
+         user = db.session.scalar(
+             sa.select(User).where(User.username == form.username.data))
+         if user is None or not user.check_password(form.password.data):
++            record_failed_attempt(ip)
+             flash(_('Invalid username or password'))
+             return redirect(url_for('auth.login'))
+         login_user(user, remember=form.remember_me.data)
+
+diff --git a/app/auth/limiter.py b/app/auth/limiter.py
+new file mode 100644
+--- /dev/null
++++ b/app/auth/limiter.py
++"""Simple in-process brute-force protection for the login endpoint.
++
++Tracks failed login attempts per IP address using a sliding-window counter.
++After LOGIN_ATTEMPT_LIMIT failures within LOGIN_WINDOW_SECONDS the IP is
++blocked until the oldest failure falls outside the window.
++"""
++import time
++import threading
++from collections import deque
++
++# --- configurable constants --------------------------------------------------
++LOGIN_ATTEMPT_LIMIT = 5    # max failures before lockout
++LOGIN_WINDOW_SECONDS = 60  # rolling window duration in seconds
++# -----------------------------------------------------------------------------
++
++_lock = threading.Lock()
++# { ip_address: deque of epoch timestamps (failed attempts) }
++_failed: dict[str, deque] = {}
++
++
++def _prune(ip: str, now: float) -> None:
++    """Remove timestamps outside the current window (caller holds the lock)."""
++    cutoff = now - LOGIN_WINDOW_SECONDS
++    dq = _failed[ip]
++    while dq and dq[0] <= cutoff:
++        dq.popleft()
++
++
++def is_rate_limited(ip: str) -> bool:
++    """Return True if *ip* has exceeded the failure threshold."""
++    now = time.time()
++    with _lock:
++        if ip not in _failed:
++            return False
++        _prune(ip, now)
++        return len(_failed[ip]) >= LOGIN_ATTEMPT_LIMIT
++
++
++def record_failed_attempt(ip: str) -> None:
++    """Record one failed login attempt from *ip*."""
++    now = time.time()
++    with _lock:
++        if ip not in _failed:
++            _failed[ip] = deque()
++        _failed[ip].append(now)
