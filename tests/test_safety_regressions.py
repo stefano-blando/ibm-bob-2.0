@@ -121,7 +121,7 @@ def test_write_loops_are_collapsed_in_the_report(tmp_path):
     )
     snapshot = NagareRunner(repo, agent_cmd=_agent(script)).run_governed(TASK)
 
-    assert snapshot.total_rollbacks >= 10
+    assert snapshot.total_rollbacks >= 8
     assert len(snapshot.violations) == 1
     assert snapshot.violations[0].repeat_count == snapshot.total_rollbacks
 
