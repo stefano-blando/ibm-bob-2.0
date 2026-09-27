@@ -1,6 +1,6 @@
 # 🌊 Nagare Governor — Lane-Assist for IBM Bob in Auto-Mode
 
-> **IBM Bob 2.0 Hackathon (lablab.ai)** · **Team**: Nagare (流れ — Flow State) · **License**: Apache-2.0
+> **IBM Bob 2.0 Hackathon (lablab.ai)** · **Team**: Nagare (流れ — Flow State) · **License**: [MIT](LICENSE)
 
 [![Tests](https://img.shields.io/badge/pytest-65%20passed-emerald)](tests/)
 [![Live Bob runs](https://img.shields.io/badge/live%20Bob%20eval-40%20runs%20(100%25%20safe)-blue)](experiments/results/live_bob_20260927/README.md)
