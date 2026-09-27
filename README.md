@@ -153,6 +153,6 @@ Debug aid: `NAGARE_HOOK_LOG=/tmp/hooks.jsonl nagare run …` records every raw B
 ## Project artifacts
 - Live Bob evidence: [`bob_sessions/live_ab_20260927/`](bob_sessions/live_ab_20260927/README.md)
 - Benchmarks: [`benchmarks/BENCHMARK_REPORT.md`](benchmarks/BENCHMARK_REPORT.md)
-- Pitch script: [`docs/PITCH_SCRIPT.md`](docs/PITCH_SCRIPT.md) · Submission text: [`docs/SUBMISSION.md`](docs/SUBMISSION.md) · Deck: [`docs/Nagare_Pitch_Deck.pptx`](docs/Nagare_Pitch_Deck.pptx)
+- Multi-repo 40-run empirical matrix: [`experiments/results/live_bob_20260927/`](experiments/results/live_bob_20260927/README.md)
 - Earlier session logs in `bob_sessions/nagare_session_2026092*.md` predate the v0.3 fixes (they include
   rollbacks of the developer's own files — the bug class v0.3 eliminates).

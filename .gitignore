@@ -34,3 +34,11 @@ Thumbs.db
 
 # Nagare session state (contract, events, quarantine)
 .nagare/
+
+# Pitch, presentation, and submission meta (kept locally, not published to repo)
+docs/PITCH_SCRIPT.md
+docs/Nagare_Pitch_Deck.pptx
+docs/SUBMISSION.md
+docs/superpowers/
+scripts/generate_pitch_deck.py
+
