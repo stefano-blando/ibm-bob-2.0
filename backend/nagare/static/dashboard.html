@@ -857,11 +857,11 @@
       $('f-safe').innerHTML = `${g.safe_runs}/${g.runs} <span class="vs">vs ${b.safe_runs}/${b.runs} ungoverned</span>`;
       $('f-safe-src').textContent = `${s.runs} live IBM Bob runs · summary.json`;
       $('f-task').innerHTML = `${g.task_passes}/${g.runs} <span class="vs">vs ${b.task_passes}/${b.runs}</span>`;
-      $('f-task-src').textContent = `cost $${g.reported_cost.toFixed(2)} vs $${b.reported_cost.toFixed(2)} (Bob session_costs)`;
+      $('f-task-src').textContent = `${g.reported_cost.toFixed(2)} vs ${b.reported_cost.toFixed(2)} Bobcoins (Bob session_costs)`;
       const row = (name, a, cls) => `<tr class="${cls}"><td>${name}</td><td>${a.runs}</td>
         <td class="${a.safe_runs === a.runs ? 'good' : 'bad'}">${a.safe_runs} (${(100 * a.safe_runs / a.runs).toFixed(0)}%)</td>
-        <td>${a.task_passes} / ${a.runs}</td><td>${a.regression_passes} / ${a.runs}</td><td>${a.denied}</td><td>$${a.reported_cost.toFixed(2)}</td></tr>`;
-      $('matrix').innerHTML = `<thead><tr><th>Arm</th><th>Runs</th><th>Runs with no out-of-scope change</th><th>Task tests passed</th><th>Regression tests passed</th><th>Writes denied by hook</th><th>Bob cost</th></tr></thead>
+        <td>${a.task_passes} / ${a.runs}</td><td>${a.regression_passes} / ${a.runs}</td><td>${a.denied}</td><td>${a.reported_cost.toFixed(2)}</td></tr>`;
+      $('matrix').innerHTML = `<thead><tr><th>Arm</th><th>Runs</th><th>Runs with no out-of-scope change</th><th>Task tests passed</th><th>Regression tests passed</th><th>Writes denied by hook</th><th>Bobcoins</th></tr></thead>
         <tbody>${row('Ungoverned bob run', b, '')}${row('Nagare-governed', g, 'gov')}</tbody>`;
     }
     const bm = ev.benchmarks || [];

@@ -43,10 +43,10 @@ Everything installs into `.bob/settings.json` for the session only and is restor
 ### Systematic live evaluation matrix (40 runs across 10 tasks, 3 real repositories)
 Full run-level logs, diffs, and cost data: [`experiments/results/live_bob_20260927/`](experiments/results/live_bob_20260927/README.md).
 
-| Arm | Runs | Safe Runs | Task Passed | Regressions Passed | Denied Out-of-Scope Writes | Total Bob Cost |
+| Arm | Runs | Safe Runs | Task Passed | Regressions Passed | Denied Out-of-Scope Writes | Total Bob Cost (Bobcoins) |
 |---|---:|---:|---:|---:|---:|---:|
-| **Baseline (ungoverned)** | 20 | 17 (85%) | 12 / 20 | 18 / 20 | 0 | $10.29 |
-| **Nagare (governed)** | 20 | **20 (100%)** | **13 / 20** | **19 / 20** | **26** | $11.01 |
+| **Baseline (ungoverned)** | 20 | 17 (85%) | 12 / 20 | 18 / 20 | 0 | 10.29 |
+| **Nagare (governed)** | 20 | **20 (100%)** | **13 / 20** | **19 / 20** | **26** | 11.01 |
 
 ### Live IBM Bob A/B (case study: rate limiter vs restricted schema)
 Full diffs, transcripts and Bob's own cost lines: [`bob_sessions/live_ab_20260927/`](bob_sessions/live_ab_20260927/README.md).
